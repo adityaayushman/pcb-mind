@@ -2,13 +2,13 @@ import asyncio
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.security import get_current_user, require_role, CurrentUser
 from app.core.config import settings
-from app.db.database import get_db
+from app.db.database import get_db, AsyncSessionLocal
 from app.db.models import Inspection, AIPrediction, GoldenPCB, PCBTemplate
 from app.schemas.inspection import InspectionOut
 from app.services import ai_inference, storage
@@ -17,8 +17,54 @@ from app.services import export as export_service
 router = APIRouter(prefix="/api/inspections", tags=["inspections"])
 
 
-@router.post("", response_model=InspectionOut, status_code=201)
+async def _process_inspection(
+    inspection_id: uuid.UUID, contents: bytes, golden_component_map: dict | None
+) -> None:
+    """Runs the actual (slow) inference after the HTTP response has already
+    gone back to the client — a cold instance on a fractional-vCPU host can
+    take 60-80s+ for model load + inference, comfortably past most
+    client/proxy request timeouts. Decoupling this from the request/response
+    cycle means no timeout, anywhere in the chain, can ever cut it off
+    mid-inference; the frontend polls GET /{id} instead (see StagedProgress
+    in the frontend) using the queued/processing states that already existed
+    in the schema but were never actually used until now."""
+    try:
+        result = await asyncio.to_thread(ai_inference.run_inspection, contents, golden_component_map)
+    except Exception:
+        async with AsyncSessionLocal() as db:
+            inspection = await db.get(Inspection, inspection_id)
+            if inspection:
+                inspection.status = "error"
+                inspection.completed_at = datetime.utcnow()
+                await db.commit()
+        return
+
+    async with AsyncSessionLocal() as db:
+        inspection = await db.get(Inspection, inspection_id)
+        if not inspection:
+            return
+        inspection.status = "passed" if result.passed else "failed"
+        inspection.overall_confidence = result.overall_confidence
+        inspection.defect_count = len(result.detections)
+        inspection.inference_time_ms = result.inference_time_ms
+        inspection.completed_at = datetime.utcnow()
+
+        for d in result.detections:
+            db.add(
+                AIPrediction(
+                    inspection_id=inspection_id,
+                    defect_type=d.defect_type,
+                    component_label=d.component_label,
+                    bounding_box=d.bbox,
+                    confidence=d.confidence,
+                )
+            )
+        await db.commit()
+
+
+@router.post("", response_model=InspectionOut, status_code=202)
 async def create_inspection(
+    background_tasks: BackgroundTasks,
     template_id: uuid.UUID = Form(...),
     golden_pcb_id: uuid.UUID | None = Form(None),
     file: UploadFile = File(...),
@@ -50,48 +96,22 @@ async def create_inspection(
             raise HTTPException(404, "Golden PCB not found")
         golden_component_map = row[0].component_map
 
-    # Critical: run_inspection() is synchronous, CPU-bound work that can take
-    # 30-60s+ on a cold instance (model load + inference). Calling it
-    # directly here would block the entire event loop for that whole
-    # duration — including Render's own health-check pings, which is enough
-    # for the platform to conclude the instance is unhealthy and kill it.
-    # asyncio.to_thread offloads it to a worker thread so the loop stays
-    # responsive.
-    result = await asyncio.to_thread(ai_inference.run_inspection, contents, golden_component_map)
-
-    # No annotated_image or eager heatmap here — DefectOverlay draws boxes
-    # client-side from bbox JSON + the original image, and the heatmap is
-    # generated lazily via GET /{id}/heatmap (see services/heatmap.py).
-    # Both used to run on this same request and competed for memory with
-    # YOLO/torch's own first-load spike, enough to OOM a 512MB instance.
+    # Return as soon as the upload is done — inference happens afterward, in
+    # the background (see _process_inspection above).
     inspection = Inspection(
         organization_id=user.organization_id,
         template_id=template_id,
         golden_pcb_id=golden_pcb_id,
         uploaded_by=user.id,
         image_url=image_url,
-        status="passed" if result.passed else "failed",
-        overall_confidence=result.overall_confidence,
-        defect_count=len(result.detections),
-        inference_time_ms=result.inference_time_ms,
-        completed_at=datetime.utcnow(),
+        status="processing",
     )
     db.add(inspection)
-    await db.flush()
-
-    for d in result.detections:
-        db.add(
-            AIPrediction(
-                inspection_id=inspection.id,
-                defect_type=d.defect_type,
-                component_label=d.component_label,
-                bounding_box=d.bbox,
-                confidence=d.confidence,
-            )
-        )
-
     await db.commit()
     await db.refresh(inspection)
+
+    background_tasks.add_task(_process_inspection, inspection.id, contents, golden_component_map)
+
     return inspection
 
 

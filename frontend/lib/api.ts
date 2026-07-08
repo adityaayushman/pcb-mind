@@ -86,17 +86,37 @@ export interface Profile {
   organization_id: string | null;
 }
 
+// Inspection creation returns as soon as the upload lands — the model runs
+// afterward in the background (a cold instance can take 60-80s+, well past
+// most client/proxy request timeouts), so callers poll this until the
+// status leaves queued/processing rather than awaiting one long request.
+async function pollInspection(
+  id: string,
+  { intervalMs = 2000, timeoutMs = 180_000 }: { intervalMs?: number; timeoutMs?: number } = {}
+): Promise<Inspection> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const inspection = await apiGet<Inspection>(`/api/inspections/${id}`);
+    if (inspection.status !== "queued" && inspection.status !== "processing") {
+      return inspection;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error("Inspection is taking longer than expected — check back on the dashboard shortly");
+}
+
 export const api = {
   getDashboard: () => apiGet<DashboardStats>("/api/dashboard"),
   getMe: () => apiGet<Profile>("/api/auth/me"),
   listInspections: () => apiGet<Inspection[]>("/api/inspections"),
   getInspection: (id: string) => apiGet<Inspection>(`/api/inspections/${id}`),
-  createInspection: (templateId: string, goldenPcbId: string | undefined, file: File) => {
+  createInspection: async (templateId: string, goldenPcbId: string | undefined, file: File) => {
     const form = new FormData();
     form.append("template_id", templateId);
     if (goldenPcbId) form.append("golden_pcb_id", goldenPcbId);
     form.append("file", file);
-    return apiPostForm<Inspection>("/api/inspections", form);
+    const inspection = await apiPostForm<Inspection>("/api/inspections", form);
+    return pollInspection(inspection.id);
   },
   getReportUrl: (id: string) => apiGet<{ report_url: string }>(`/api/inspections/${id}/report`),
   getHeatmapUrl: (id: string) =>
