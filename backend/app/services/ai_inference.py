@@ -157,7 +157,10 @@ def _build_heatmap(img: np.ndarray, detections: list[Detection]) -> np.ndarray |
 
     h, w = img.shape[:2]
     accum = np.zeros((h, w), dtype=np.float32)
-    y_idx, x_idx = np.ogrid[:h, :w]
+    # np.ogrid yields int64 arrays; combined with the Python floats below
+    # that'd upcast every intermediate to float64 (double the memory of
+    # what this needs) — cast to float32 up front to keep it there.
+    y_idx, x_idx = (a.astype(np.float32) for a in np.ogrid[:h, :w])
     for d in detections:
         bx, by = d.bbox["x"] * w, d.bbox["y"] * h
         bw, bh = d.bbox["width"] * w, d.bbox["height"] * h
