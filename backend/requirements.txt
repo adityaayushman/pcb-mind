@@ -11,6 +11,15 @@ httpx==0.27.2
 pillow==10.4.0
 opencv-python-headless==4.10.0.84
 numpy==1.26.4
+
+# CPU-only PyTorch build: the default PyPI wheel pulls in the full CUDA
+# toolkit (nvidia-cublas, nvidia-cudnn, triton, ...), which is dead weight
+# on a CPU-only host and dramatically inflates both image size and runtime
+# memory — enough to OOM a 512MB instance just loading the model.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
+
 ultralytics==8.2.103
 reportlab==4.2.2
 python-dotenv==1.0.1

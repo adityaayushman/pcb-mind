@@ -15,14 +15,27 @@ MVP implementation notes:
   treated as scaffolding, not a working detector.
 """
 
+import gc
 import time
 from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 
 from app.core.config import settings
+
+# This runs on small (often 512MB) hosts with no GPU — capping thread pools
+# avoids each library spinning up one thread per core, which costs real
+# memory (stacks/arenas) for no benefit at this instance size.
+cv2.setNumThreads(1)
+torch.set_num_threads(1)
+
+# The size the model was actually trained at (see ml/train.py) — inference
+# runs at this resolution too, rather than a larger one that YOLO would just
+# have to letterbox back down internally.
+_INFERENCE_IMGSZ = 512
 
 _model: YOLO | None = None
 
@@ -83,7 +96,7 @@ def _preprocess(image_bytes: bytes) -> np.ndarray:
     if img is None:
         raise ValueError("Could not decode image")
     # normalize size/lighting so inference is consistent across camera setups
-    img = cv2.resize(img, (1280, 1280))
+    img = cv2.resize(img, (_INFERENCE_IMGSZ, _INFERENCE_IMGSZ))
     img = cv2.convertScaleAbs(img, alpha=1.1, beta=10)
     return img
 
@@ -115,7 +128,10 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
 
     img = _preprocess(image_bytes)
     model = _get_model()
-    results = model.predict(img, conf=settings.INFERENCE_CONFIDENCE_THRESHOLD, verbose=False)
+    with torch.inference_mode():
+        results = model.predict(
+            img, conf=settings.INFERENCE_CONFIDENCE_THRESHOLD, imgsz=_INFERENCE_IMGSZ, verbose=False
+        )
 
     detections: list[Detection] = []
     h, w = img.shape[:2]
@@ -140,10 +156,16 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
         sum(d.confidence for d in detections) / len(detections) if detections else 1.0
     )
     elapsed_ms = int((time.perf_counter() - start) * 1000)
+    annotated_image = results[0].plot() if results else img
+
+    # Release the model's raw tensors/results promptly rather than waiting
+    # for Python's regular GC cycle — matters on memory-constrained hosts.
+    del results
+    gc.collect()
 
     return InspectionResult(
         detections=detections,
         overall_confidence=round(overall_confidence, 4),
         inference_time_ms=elapsed_ms,
-        annotated_image=results[0].plot() if results else img,
+        annotated_image=annotated_image,
     )
