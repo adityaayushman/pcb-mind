@@ -1,3 +1,4 @@
+import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
@@ -9,6 +10,14 @@ from app.db.models import Profile
 
 bearer_scheme = HTTPBearer()
 
+# Supabase projects created since JWT Signing Keys rolled out sign access
+# tokens with an asymmetric key (ES256) and publish the public half at this
+# well-known JWKS endpoint — there's no shared secret to verify against for
+# these. Older projects still on the legacy shared secret sign with HS256,
+# which SUPABASE_JWT_SECRET covers instead. Which one applies is read off
+# each token's own `alg` header, so both work without configuration.
+_jwks_cache: dict | None = None
+
 
 class CurrentUser:
     def __init__(self, id: str, email: str | None, role: str | None, organization_id: str | None):
@@ -18,14 +27,32 @@ class CurrentUser:
         self.organization_id = organization_id
 
 
-def _decode_supabase_jwt(token: str) -> dict:
+async def _get_jwks(force_refresh: bool = False) -> dict:
+    global _jwks_cache
+    if _jwks_cache is None or force_refresh:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+            resp.raise_for_status()
+            _jwks_cache = resp.json()
+    return _jwks_cache
+
+
+async def _decode_supabase_jwt(token: str) -> dict:
     try:
-        return jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
+        alg = jwt.get_unverified_header(token).get("alg", "HS256")
+
+        if alg == "HS256":
+            return jwt.decode(
+                token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated"
+            )
+
+        try:
+            jwks = await _get_jwks()
+            return jwt.decode(token, jwks, algorithms=[alg], audience="authenticated")
+        except JWTError:
+            # kid not found locally could just mean Supabase rotated keys
+            jwks = await _get_jwks(force_refresh=True)
+            return jwt.decode(token, jwks, algorithms=[alg], audience="authenticated")
     except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,7 +70,7 @@ async def get_current_user(
     (kept out of the token itself to avoid staleness). A user who hasn't
     called /api/auth/bootstrap yet simply has role=None/organization_id=None.
     """
-    payload = _decode_supabase_jwt(credentials.credentials)
+    payload = await _decode_supabase_jwt(credentials.credentials)
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Token missing subject")
