@@ -54,6 +54,12 @@ export interface DashboardStats {
   recent: Inspection[];
 }
 
+export interface PcbTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
 export const api = {
   getDashboard: () => apiGet<DashboardStats>("/api/dashboard"),
   listInspections: () => apiGet<Inspection[]>("/api/inspections"),
@@ -65,7 +71,19 @@ export const api = {
     form.append("file", file);
     return apiPostForm<Inspection>("/api/inspections", form);
   },
-  listTemplates: () => apiGet<{ id: string; name: string; description: string | null }[]>(
-    "/api/pcb-templates"
-  ),
+  listTemplates: () => apiGet<PcbTemplate[]>("/api/pcb-templates"),
+  createTemplate: (name: string, description?: string) => {
+    const form = new FormData();
+    form.append("name", name);
+    if (description) form.append("description", description);
+    return apiPostForm<PcbTemplate>("/api/pcb-templates", form);
+  },
+  uploadGoldenPcb: (templateId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiPostForm<{ id: string; image_url: string }>(
+      `/api/pcb-templates/${templateId}/golden`,
+      form
+    );
+  },
 };

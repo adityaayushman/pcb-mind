@@ -17,12 +17,20 @@ export default function DashboardPage() {
     <main className="max-w-6xl mx-auto px-6 py-12">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <Link
-          href="/dashboard/upload"
-          className="bg-brand-500 hover:bg-brand-600 transition-colors px-4 py-2 rounded-lg font-medium text-neutral-950 text-sm"
-        >
-          New inspection
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/templates"
+            className="border border-neutral-700 hover:border-neutral-500 transition-colors px-4 py-2 rounded-lg font-medium text-sm"
+          >
+            Templates
+          </Link>
+          <Link
+            href="/dashboard/upload"
+            className="bg-brand-500 hover:bg-brand-600 transition-colors px-4 py-2 rounded-lg font-medium text-neutral-950 text-sm"
+          >
+            New inspection
+          </Link>
+        </div>
       </div>
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
