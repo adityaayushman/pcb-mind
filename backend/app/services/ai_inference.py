@@ -212,17 +212,20 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
     )
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     annotated_image = results[0].plot() if results else img
-    heatmap_image = _build_heatmap(img, detections)
 
     # Release the model's raw tensors/results promptly rather than waiting
     # for Python's regular GC cycle — matters on memory-constrained hosts.
     del results
     gc.collect()
 
+    # Heatmap generation is deliberately NOT done here (see services/heatmap.py
+    # for the lazy, on-demand path) — computing it eagerly on this same
+    # request competes for memory with YOLO/torch's own first-load spike,
+    # which is enough to OOM a 512MB instance on a cold start.
     return InspectionResult(
         detections=detections,
         overall_confidence=round(overall_confidence, 4),
         inference_time_ms=elapsed_ms,
         annotated_image=annotated_image,
-        heatmap_image=heatmap_image,
+        heatmap_image=None,
     )

@@ -20,6 +20,8 @@ export default function InspectionDetailPage() {
   const [reportUrl, setReportUrl] = useState<string | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState<"report" | "image" | null>(null);
+  const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
 
   useEffect(() => {
     api.getInspection(id).then(setInspection).catch((e) => setError(e.message));
@@ -37,6 +39,23 @@ export default function InspectionDetailPage() {
       return null;
     } finally {
       setReportLoading(false);
+    }
+  }
+
+  // Heatmap generation is on-demand (see backend/app/services/heatmap.py) —
+  // it isn't ready the moment an inspection is created, so it's fetched only
+  // when the user actually asks to see it, same pattern as the PDF report.
+  async function handleShowHeatmap() {
+    setView("heatmap");
+    if (heatmapUrl) return;
+    setHeatmapLoading(true);
+    try {
+      const { heatmap_image_url } = await api.getHeatmapUrl(id);
+      setHeatmapUrl(heatmap_image_url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate heatmap");
+    } finally {
+      setHeatmapLoading(false);
     }
   }
 
@@ -92,8 +111,8 @@ export default function InspectionDetailPage() {
           Detections
         </button>
         <button
-          onClick={() => setView("heatmap")}
-          disabled={!inspection.heatmap_image_url}
+          onClick={handleShowHeatmap}
+          disabled={inspection.defect_count === 0}
           className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 ${
             view === "heatmap" ? "bg-neutral-100 text-neutral-950" : "bg-neutral-900 text-neutral-400"
           }`}
@@ -102,15 +121,21 @@ export default function InspectionDetailPage() {
         </button>
       </div>
 
-      {view === "detections" || !inspection.heatmap_image_url ? (
+      {view === "detections" ? (
         <DefectOverlay imageUrl={inspection.image_url} predictions={inspection.predictions} />
-      ) : (
+      ) : heatmapLoading ? (
+        <div className="rounded-lg border border-neutral-800 aspect-square max-w-full flex items-center justify-center text-sm text-neutral-500">
+          Generating heatmap…
+        </div>
+      ) : heatmapUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={inspection.heatmap_image_url}
+          src={heatmapUrl}
           alt="Defect confidence heatmap"
           className="rounded-lg border border-neutral-800 max-w-full block"
         />
+      ) : (
+        <p className="text-sm text-neutral-500">Heatmap unavailable for this inspection.</p>
       )}
 
       <div className="grid grid-cols-3 gap-4 my-8">

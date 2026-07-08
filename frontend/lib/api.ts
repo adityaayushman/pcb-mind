@@ -99,6 +99,8 @@ export const api = {
     return apiPostForm<Inspection>("/api/inspections", form);
   },
   getReportUrl: (id: string) => apiGet<{ report_url: string }>(`/api/inspections/${id}/report`),
+  getHeatmapUrl: (id: string) =>
+    apiGet<{ heatmap_image_url: string | null }>(`/api/inspections/${id}/heatmap`),
   exportInspections: (format: "csv" | "xlsx") =>
     apiDownload(`/api/inspections/export?format=${format}`, `inspections.${format}`),
   listTemplates: () => apiGet<PcbTemplate[]>("/api/pcb-templates"),

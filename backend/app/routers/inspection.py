@@ -58,14 +58,9 @@ async def create_inspection(
                 buf.tobytes(), "image/jpeg", prefix="annotated"
             )
 
-    heatmap_image_url = None
-    if result.heatmap_image is not None:
-        ok, buf = cv2.imencode(".jpg", result.heatmap_image)
-        if ok:
-            heatmap_image_url = storage.upload_image(
-                buf.tobytes(), "image/jpeg", prefix="heatmap"
-            )
-
+    # Heatmap is generated lazily via GET /{id}/heatmap (see services/heatmap.py)
+    # rather than here — computing it on this same request competes for memory
+    # with YOLO/torch's own first-load spike, enough to OOM a 512MB instance.
     inspection = Inspection(
         organization_id=user.organization_id,
         template_id=template_id,
@@ -73,7 +68,6 @@ async def create_inspection(
         uploaded_by=user.id,
         image_url=image_url,
         annotated_image_url=annotated_image_url,
-        heatmap_image_url=heatmap_image_url,
         status="passed" if result.passed else "failed",
         overall_confidence=result.overall_confidence,
         defect_count=len(result.detections),
@@ -166,3 +160,22 @@ async def download_report(
 
     url = await get_or_generate_report(db, inspection)
     return {"report_url": url}
+
+
+@router.get("/{inspection_id}/heatmap")
+async def get_heatmap(
+    inspection_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Generates (or returns cached) confidence heatmap. See services/heatmap.py.
+    Returns heatmap_image_url=None for a clean "passed" inspection (nothing
+    to visualize) rather than an error."""
+    from app.services.heatmap import get_or_generate_heatmap
+
+    inspection = await db.get(Inspection, inspection_id)
+    if not inspection or inspection.organization_id != user.organization_id:
+        raise HTTPException(404, "Inspection not found")
+
+    url = await get_or_generate_heatmap(db, inspection)
+    return {"heatmap_image_url": url}
