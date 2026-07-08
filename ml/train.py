@@ -36,7 +36,42 @@ def download_dataset(api_key: str, workspace: str, project: str, version: int, d
     return Path(ds.location)
 
 
-def make_subset(data_dir: Path, max_images: int) -> Path:
+# Roboflow's YOLOv8 export names the validation key "val" in data.yaml but
+# the on-disk folder "valid" — and its relative paths (e.g. "../train/images")
+# assume a nesting level this download doesn't actually have. Resolve splits
+# against the real directory layout instead of trusting the yaml's paths.
+_SPLIT_DIR_CANDIDATES = {"train": ["train"], "val": ["valid", "val"], "test": ["test"]}
+
+
+def _resolve_splits(data_dir: Path, cfg: dict) -> dict:
+    resolved = {}
+    for split, candidates in _SPLIT_DIR_CANDIDATES.items():
+        if split not in cfg:
+            continue
+        for folder in candidates:
+            if (data_dir / folder / "images").is_dir():
+                resolved[split] = folder
+                break
+    return resolved
+
+
+def normalize_data_yaml(data_dir: Path) -> dict:
+    """Rewrites data.yaml's split paths to match the real on-disk layout and
+    pins an explicit `path`, so ultralytics doesn't have to guess."""
+    yaml_path = data_dir / "data.yaml"
+    with open(yaml_path) as f:
+        cfg = yaml.safe_load(f)
+
+    for split, folder in _resolve_splits(data_dir, cfg).items():
+        cfg[split] = f"{folder}/images"
+    cfg["path"] = str(data_dir)
+
+    with open(yaml_path, "w") as f:
+        yaml.safe_dump(cfg, f)
+    return cfg
+
+
+def make_subset(data_dir: Path, cfg: dict, max_images: int) -> Path:
     """Copies a capped number of images/labels per split into a sibling
     `-subsetN` dir with its own data.yaml, leaving the full download untouched
     so a later full run doesn't need to re-download anything."""
@@ -44,18 +79,12 @@ def make_subset(data_dir: Path, max_images: int) -> Path:
     if subset_dir.exists():
         return subset_dir
 
-    with open(data_dir / "data.yaml") as f:
-        cfg = yaml.safe_load(f)
-
-    for split in ("train", "val", "valid", "test"):
-        if split not in cfg:
-            continue
-        src_images = (data_dir / cfg[split]).resolve()
-        if not src_images.is_dir():
-            continue
-        src_labels = src_images.parent.parent / "labels"
-        dst_images = subset_dir / split / "images"
-        dst_labels = subset_dir / split / "labels"
+    subset_cfg = dict(cfg)
+    for split, folder in _resolve_splits(data_dir, cfg).items():
+        src_images = data_dir / folder / "images"
+        src_labels = data_dir / folder / "labels"
+        dst_images = subset_dir / folder / "images"
+        dst_labels = subset_dir / folder / "labels"
         dst_images.mkdir(parents=True, exist_ok=True)
         dst_labels.mkdir(parents=True, exist_ok=True)
 
@@ -65,10 +94,11 @@ def make_subset(data_dir: Path, max_images: int) -> Path:
             label_path = src_labels / f"{img_path.stem}.txt"
             if label_path.exists():
                 shutil.copy2(label_path, dst_labels / label_path.name)
-        cfg[split] = f"{split}/images"
+        subset_cfg[split] = f"{folder}/images"
 
+    subset_cfg["path"] = str(subset_dir)
     with open(subset_dir / "data.yaml", "w") as f:
-        yaml.safe_dump(cfg, f)
+        yaml.safe_dump(subset_cfg, f)
 
     return subset_dir
 
@@ -98,14 +128,13 @@ def main():
     print(f"Downloading {args.workspace}/{args.project} v{args.version} -> {dest} ...")
     data_dir = download_dataset(args.api_key, args.workspace, args.project, args.version, dest)
 
-    with open(data_dir / "data.yaml") as f:
-        cfg = yaml.safe_load(f)
+    cfg = normalize_data_yaml(data_dir)
     print("Classes in dataset:", cfg.get("names"))
 
     if args.download_only:
         return
 
-    train_dir = make_subset(data_dir, args.max_images) if args.max_images else data_dir
+    train_dir = make_subset(data_dir, cfg, args.max_images) if args.max_images else data_dir
 
     from ultralytics import YOLO
 
