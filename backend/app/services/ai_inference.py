@@ -211,21 +211,23 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
         sum(d.confidence for d in detections) / len(detections) if detections else 1.0
     )
     elapsed_ms = int((time.perf_counter() - start) * 1000)
-    annotated_image = results[0].plot() if results else img
 
     # Release the model's raw tensors/results promptly rather than waiting
     # for Python's regular GC cycle — matters on memory-constrained hosts.
     del results
     gc.collect()
 
-    # Heatmap generation is deliberately NOT done here (see services/heatmap.py
-    # for the lazy, on-demand path) — computing it eagerly on this same
-    # request competes for memory with YOLO/torch's own first-load spike,
-    # which is enough to OOM a 512MB instance on a cold start.
+    # Neither annotated_image nor heatmap_image are computed here anymore:
+    # DefectOverlay already draws boxes client-side from bbox JSON + the
+    # original image (annotated_image_url was uploaded on every inspection
+    # but never actually rendered anywhere in the frontend — pure dead
+    # weight in the hot path). Heatmap is generated lazily on demand instead
+    # (see services/heatmap.py). Both were competing for memory with
+    # YOLO/torch's own first-load spike, enough to OOM a 512MB instance.
     return InspectionResult(
         detections=detections,
         overall_confidence=round(overall_confidence, 4),
         inference_time_ms=elapsed_ms,
-        annotated_image=annotated_image,
+        annotated_image=None,
         heatmap_image=None,
     )

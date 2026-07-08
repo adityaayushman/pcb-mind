@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 
-import cv2
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -50,24 +49,17 @@ async def create_inspection(
 
     result = ai_inference.run_inspection(contents, golden_component_map)
 
-    annotated_image_url = None
-    if result.annotated_image is not None:
-        ok, buf = cv2.imencode(".jpg", result.annotated_image)
-        if ok:
-            annotated_image_url = storage.upload_image(
-                buf.tobytes(), "image/jpeg", prefix="annotated"
-            )
-
-    # Heatmap is generated lazily via GET /{id}/heatmap (see services/heatmap.py)
-    # rather than here — computing it on this same request competes for memory
-    # with YOLO/torch's own first-load spike, enough to OOM a 512MB instance.
+    # No annotated_image or eager heatmap here — DefectOverlay draws boxes
+    # client-side from bbox JSON + the original image, and the heatmap is
+    # generated lazily via GET /{id}/heatmap (see services/heatmap.py).
+    # Both used to run on this same request and competed for memory with
+    # YOLO/torch's own first-load spike, enough to OOM a 512MB instance.
     inspection = Inspection(
         organization_id=user.organization_id,
         template_id=template_id,
         golden_pcb_id=golden_pcb_id,
         uploaded_by=user.id,
         image_url=image_url,
-        annotated_image_url=annotated_image_url,
         status="passed" if result.passed else "failed",
         overall_confidence=result.overall_confidence,
         defect_count=len(result.detections),
