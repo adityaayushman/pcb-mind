@@ -1,0 +1,25 @@
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/.next/
+
+# Env / secrets
+backend/.env
+frontend/.env.local
+ml/.env
+
+# ML training artifacts (final weights are committed under backend/, not here)
+ml/datasets/
+ml/runs/
+ml/*.pt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Claude Code settings (machine-specific)
+.claude/settings.local.json
