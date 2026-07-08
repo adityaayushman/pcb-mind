@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -32,7 +33,9 @@ async def create_inspection(
     if len(contents) > settings.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"Image exceeds {settings.MAX_UPLOAD_MB}MB limit")
 
-    image_url = storage.upload_image(contents, file.content_type or "image/jpeg")
+    image_url = await asyncio.to_thread(
+        storage.upload_image, contents, file.content_type or "image/jpeg"
+    )
 
     golden_component_map = None
     if golden_pcb_id:
@@ -47,7 +50,14 @@ async def create_inspection(
             raise HTTPException(404, "Golden PCB not found")
         golden_component_map = row[0].component_map
 
-    result = ai_inference.run_inspection(contents, golden_component_map)
+    # Critical: run_inspection() is synchronous, CPU-bound work that can take
+    # 30-60s+ on a cold instance (model load + inference). Calling it
+    # directly here would block the entire event loop for that whole
+    # duration — including Render's own health-check pings, which is enough
+    # for the platform to conclude the instance is unhealthy and kill it.
+    # asyncio.to_thread offloads it to a worker thread so the loop stays
+    # responsive.
+    result = await asyncio.to_thread(ai_inference.run_inspection, contents, golden_component_map)
 
     # No annotated_image or eager heatmap here — DefectOverlay draws boxes
     # client-side from bbox JSON + the original image, and the heatmap is

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,7 +60,9 @@ async def upload_golden_pcb(
         raise HTTPException(404, "PCB template not found")
 
     contents = await file.read()
-    image_url = storage.upload_image(contents, file.content_type or "image/jpeg", prefix="golden")
+    image_url = await asyncio.to_thread(
+        storage.upload_image, contents, file.content_type or "image/jpeg", prefix="golden"
+    )
     golden = GoldenPCB(template_id=template_id, image_url=image_url, component_map=None)
     db.add(golden)
     await db.commit()

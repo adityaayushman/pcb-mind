@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -48,7 +49,7 @@ async def get_or_generate_report(db: AsyncSession, inspection: Inspection) -> st
     c.save()
     buffer.seek(0)
 
-    url = storage.upload_report(buffer.read(), str(inspection.id))
+    url = await asyncio.to_thread(storage.upload_report, buffer.read(), str(inspection.id))
     inspection.report_url = url
     await db.commit()
     return url

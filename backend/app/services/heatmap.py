@@ -8,6 +8,8 @@ report.py's get_or_generate pattern — build once, cache the URL, serve that
 on every later request.
 """
 
+import asyncio
+
 import cv2
 import httpx
 import numpy as np
@@ -56,7 +58,7 @@ async def get_or_generate_heatmap(db: AsyncSession, inspection: Inspection) -> s
     if not ok:
         return None
 
-    url = storage.upload_image(buf.tobytes(), "image/jpeg", prefix="heatmap")
+    url = await asyncio.to_thread(storage.upload_image, buf.tobytes(), "image/jpeg", prefix="heatmap")
     inspection.heatmap_image_url = url
     await db.commit()
     return url
