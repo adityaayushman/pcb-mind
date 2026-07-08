@@ -7,12 +7,13 @@ export default function LandingPage() {
         Manufacturing Intelligence
       </p>
       <h1 className="text-5xl font-semibold tracking-tight mb-6">
-        Catch PCB defects before they leave the line.
+        Catch PCB fabrication defects before they leave the line.
       </h1>
       <p className="text-neutral-400 text-lg max-w-2xl mb-10">
-        PCBMind AI inspects every board against your Golden PCB reference,
-        flags missing or misplaced components in seconds, and gives your QA
-        team a report they can act on — not just a pass/fail stamp.
+        PCBMind AI inspects every bare board with a trained defect-detection
+        model — missing holes, mouse bites, opens, shorts, spurs, and
+        spurious copper — in seconds, with a severity-ranked report your QA
+        team can act on, not just a pass/fail stamp.
       </p>
       <div className="flex gap-4">
         <Link

@@ -2,16 +2,17 @@ import uuid
 from datetime import datetime
 
 import cv2
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.security import get_current_user, CurrentUser
+from app.core.security import get_current_user, require_role, CurrentUser
 from app.core.config import settings
 from app.db.database import get_db
 from app.db.models import Inspection, AIPrediction, GoldenPCB, PCBTemplate
 from app.schemas.inspection import InspectionOut
 from app.services import ai_inference, storage
+from app.services import export as export_service
 
 router = APIRouter(prefix="/api/inspections", tags=["inspections"])
 
@@ -57,6 +58,14 @@ async def create_inspection(
                 buf.tobytes(), "image/jpeg", prefix="annotated"
             )
 
+    heatmap_image_url = None
+    if result.heatmap_image is not None:
+        ok, buf = cv2.imencode(".jpg", result.heatmap_image)
+        if ok:
+            heatmap_image_url = storage.upload_image(
+                buf.tobytes(), "image/jpeg", prefix="heatmap"
+            )
+
     inspection = Inspection(
         organization_id=user.organization_id,
         template_id=template_id,
@@ -64,6 +73,7 @@ async def create_inspection(
         uploaded_by=user.id,
         image_url=image_url,
         annotated_image_url=annotated_image_url,
+        heatmap_image_url=heatmap_image_url,
         status="passed" if result.passed else "failed",
         overall_confidence=result.overall_confidence,
         defect_count=len(result.detections),
@@ -87,6 +97,29 @@ async def create_inspection(
     await db.commit()
     await db.refresh(inspection)
     return inspection
+
+
+@router.get("/export")
+async def export_inspections(
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_role("admin", "qa_engineer")),
+):
+    """Bulk org-wide inspection export — gated to admin/qa_engineer since it's
+    a supervisory view across everyone's inspections, not "your own work"."""
+    if format == "xlsx":
+        content = await export_service.export_xlsx(db, user.organization_id)
+        return Response(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="inspections.xlsx"'},
+        )
+    content = await export_service.export_csv(db, user.organization_id)
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="inspections.csv"'},
+    )
 
 
 @router.get("/{inspection_id}", response_model=InspectionOut)

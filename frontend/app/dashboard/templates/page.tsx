@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { api, PcbTemplate } from "@/lib/api";
 
 export default function TemplatesPage() {
@@ -64,11 +63,8 @@ export default function TemplatesPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-6 py-12">
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8">
         <h1 className="text-2xl font-semibold">PCB templates</h1>
-        <Link href="/dashboard/upload" className="text-sm text-brand-500 hover:underline">
-          New inspection →
-        </Link>
       </div>
 
       <form

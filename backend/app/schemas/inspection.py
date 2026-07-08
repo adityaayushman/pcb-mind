@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
+
+from app.core.severity import get_severity
 
 
 class BoundingBox(BaseModel):
@@ -17,6 +19,11 @@ class DefectPrediction(BaseModel):
     bounding_box: BoundingBox
     confidence: float
 
+    @computed_field
+    @property
+    def severity(self) -> str:
+        return get_severity(self.defect_type)
+
     class Config:
         from_attributes = True
 
@@ -31,6 +38,7 @@ class InspectionOut(BaseModel):
     status: str
     image_url: str
     annotated_image_url: str | None = None
+    heatmap_image_url: str | None = None
     overall_confidence: float | None = None
     defect_count: int
     inference_time_ms: int | None = None

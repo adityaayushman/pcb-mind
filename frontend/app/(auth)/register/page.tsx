@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function RegisterPage() {
@@ -12,6 +13,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,9 +21,19 @@ export default function RegisterPage() {
     setError(null);
 
     const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError || !data.session) {
-      setLoading(false);
-      return setError(signUpError?.message ?? "Check your email to confirm your account.");
+    setLoading(false);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      return;
+    }
+
+    if (!data.session) {
+      // Email confirmation is required — this is success, not a failure,
+      // and previously rendered through the same red error state as an
+      // actual signup failure.
+      setAwaitingConfirmation(true);
+      return;
     }
 
     // Create the organization + profile row via the backend
@@ -34,8 +46,23 @@ export default function RegisterPage() {
       body: JSON.stringify({ full_name: fullName, organization_name: orgName }),
     });
 
-    setLoading(false);
     router.push("/dashboard");
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <main className="max-w-sm mx-auto px-6 py-24">
+        <h1 className="text-2xl font-semibold mb-4">Check your email</h1>
+        <p className="text-neutral-400 text-sm">
+          We sent a confirmation link to <span className="text-neutral-100">{email}</span>.
+          Click it to finish creating your account, then{" "}
+          <Link href="/login" className="text-brand-500 hover:underline">
+            sign in
+          </Link>
+          .
+        </p>
+      </main>
+    );
   }
 
   return (

@@ -54,6 +54,7 @@ create table inspections (
     uploaded_by uuid references profiles(id),
     image_url text not null,
     annotated_image_url text,
+    heatmap_image_url text,
     status inspection_status not null default 'queued',
     overall_confidence numeric(5,4),
     defect_count int not null default 0,

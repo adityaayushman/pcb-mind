@@ -84,10 +84,29 @@ class InspectionResult:
     overall_confidence: float = 1.0
     inference_time_ms: int = 0
     annotated_image: np.ndarray | None = None
+    heatmap_image: np.ndarray | None = None
 
     @property
     def passed(self) -> bool:
         return len(self.detections) == 0
+
+
+_CLAHE_CLIP_LIMIT = 2.0
+_CLAHE_TILE_GRID_SIZE = (8, 8)
+
+
+def _apply_clahe(img: np.ndarray) -> np.ndarray:
+    """Adaptive local contrast correction so uneven real-world lighting
+    (phone-camera glare/shadow across the board) doesn't wash out fine
+    defect edges the way a flat global contrast boost does. Runs only on
+    the L (lightness) channel in LAB space — doing this per-BGR-channel
+    would shift hue/saturation and risk the model reacting to color
+    changes rather than the copper/silkscreen edges it was trained on."""
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=_CLAHE_CLIP_LIMIT, tileGridSize=_CLAHE_TILE_GRID_SIZE)
+    l = clahe.apply(l)
+    return cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR)
 
 
 def _preprocess(image_bytes: bytes) -> np.ndarray:
@@ -95,9 +114,10 @@ def _preprocess(image_bytes: bytes) -> np.ndarray:
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise ValueError("Could not decode image")
-    # normalize size/lighting so inference is consistent across camera setups
+    # Resize first so the CLAHE tile grid is a fixed fraction of the image
+    # regardless of the source photo's native resolution.
     img = cv2.resize(img, (_INFERENCE_IMGSZ, _INFERENCE_IMGSZ))
-    img = cv2.convertScaleAbs(img, alpha=1.1, beta=10)
+    img = _apply_clahe(img)
     return img
 
 
@@ -121,6 +141,38 @@ def _diff_against_golden(detections: list[Detection], component_map: dict | None
                 )
             )
     return detections
+
+
+def _build_heatmap(img: np.ndarray, detections: list[Detection]) -> np.ndarray | None:
+    """Defect-density/confidence heatmap: one Gaussian blob per detection,
+    centered on its bbox and scaled by confidence, summed, normalized,
+    colorized, and alpha-blended over the image. This is NOT model
+    attention/Grad-CAM — it doesn't hook into YOLO's internals (fragile
+    across ultralytics versions, and easy to misrepresent as "what the
+    model saw" if done wrong). It's an honest visualization of where
+    detections landed and how confident they were. Returns None when
+    there's nothing to show (a clean "passed" inspection)."""
+    if not detections:
+        return None
+
+    h, w = img.shape[:2]
+    accum = np.zeros((h, w), dtype=np.float32)
+    y_idx, x_idx = np.ogrid[:h, :w]
+    for d in detections:
+        bx, by = d.bbox["x"] * w, d.bbox["y"] * h
+        bw, bh = d.bbox["width"] * w, d.bbox["height"] * h
+        cx, cy = bx + bw / 2, by + bh / 2
+        sigma_x, sigma_y = max(bw / 2, 4), max(bh / 2, 4)
+        gaussian = np.exp(
+            -(((x_idx - cx) ** 2) / (2 * sigma_x**2) + ((y_idx - cy) ** 2) / (2 * sigma_y**2))
+        )
+        accum += gaussian * d.confidence
+
+    if accum.max() <= 0:
+        return None
+    normalized = (accum / accum.max() * 255).astype(np.uint8)
+    colorized = cv2.applyColorMap(normalized, cv2.COLORMAP_JET)
+    return cv2.addWeighted(img, 0.6, colorized, 0.4, 0)
 
 
 def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None) -> InspectionResult:
@@ -157,6 +209,7 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
     )
     elapsed_ms = int((time.perf_counter() - start) * 1000)
     annotated_image = results[0].plot() if results else img
+    heatmap_image = _build_heatmap(img, detections)
 
     # Release the model's raw tensors/results promptly rather than waiting
     # for Python's regular GC cycle — matters on memory-constrained hosts.
@@ -168,4 +221,5 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
         overall_confidence=round(overall_confidence, 4),
         inference_time_ms=elapsed_ms,
         annotated_image=annotated_image,
+        heatmap_image=heatmap_image,
     )

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 
-from app.core.security import get_current_user, CurrentUser
+from app.core.security import get_current_user, require_role, CurrentUser
 from app.db.database import get_db
 from app.db.models import PCBTemplate, GoldenPCB
 from app.services import storage
@@ -26,7 +26,7 @@ async def create_template(
     name: str = Form(...),
     description: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_role("admin", "qa_engineer")),
 ):
     template = PCBTemplate(
         organization_id=user.organization_id, name=name, description=description, created_by=user.id
@@ -52,7 +52,7 @@ async def upload_golden_pcb(
     template_id: uuid.UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(require_role("admin", "qa_engineer")),
 ):
     template = await db.get(PCBTemplate, template_id)
     if not template or template.organization_id != user.organization_id:

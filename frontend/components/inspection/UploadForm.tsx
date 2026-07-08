@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { StagedProgress } from "./StagedProgress";
 
 export function UploadForm({ templates }: { templates: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -10,6 +11,8 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [apiDone, setApiDone] = useState(false);
+  const [resultId, setResultId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -22,13 +25,15 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
     e.preventDefault();
     if (!file || !templateId) return;
     setLoading(true);
+    setApiDone(false);
+    setResultId(null);
     setError(null);
     try {
       const inspection = await api.createInspection(templateId, undefined, file);
-      router.push(`/dashboard/inspections/${inspection.id}`);
+      setResultId(inspection.id);
+      setApiDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
       setLoading(false);
     }
   }
@@ -40,7 +45,8 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
         <select
           value={templateId}
           onChange={(e) => setTemplateId(e.target.value)}
-          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2.5"
+          disabled={loading}
+          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2.5 disabled:opacity-50"
         >
           {templates.map((t) => (
             <option key={t.id} value={t.id}>
@@ -57,7 +63,8 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
           accept="image/*"
           capture="environment"
           onChange={handleFileChange}
-          className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-500 file:text-neutral-950 file:font-medium"
+          disabled={loading}
+          className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-500 file:text-neutral-950 file:font-medium disabled:opacity-50"
         />
         {preview && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -67,13 +74,20 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={loading || !file}
-        className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors px-6 py-2.5 rounded-lg font-medium text-neutral-950"
-      >
-        {loading ? "Analyzing…" : "Run inspection"}
-      </button>
+      {loading ? (
+        <StagedProgress
+          done={apiDone}
+          onSettled={() => resultId && router.push(`/dashboard/inspections/${resultId}`)}
+        />
+      ) : (
+        <button
+          type="submit"
+          disabled={!file}
+          className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors px-6 py-2.5 rounded-lg font-medium text-neutral-950"
+        >
+          Run inspection
+        </button>
+      )}
     </form>
   );
 }

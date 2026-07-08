@@ -61,6 +61,7 @@ class Inspection(Base):
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id"))
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
     annotated_image_url: Mapped[str | None] = mapped_column(Text)
+    heatmap_image_url: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         ENUM("queued", "processing", "passed", "failed", "error", name="inspection_status"),
         default="queued",
