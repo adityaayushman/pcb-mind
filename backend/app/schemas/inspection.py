@@ -54,6 +54,13 @@ class InspectionOut(BaseModel):
     @computed_field
     @property
     def validation_notes(self) -> list[str]:
+        # Some endpoints (e.g. dashboard's "recent" list) deliberately omit
+        # `predictions` to keep the payload light while still setting the
+        # real `defect_count` -- deriving notes from an empty list there
+        # would falsely claim "no defects" on an inspection that actually
+        # failed. Only compute when predictions actually reflect reality.
+        if not self.predictions and self.defect_count > 0:
+            return []
         real_defect_types = [p.defect_type for p in self.predictions if not p.is_reference_match]
         return validate(real_defect_types).notes
 
