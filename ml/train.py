@@ -115,21 +115,62 @@ def main():
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--max-images", type=int, default=None, help="cap train images for a bounded smoke run")
     parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="DataLoader worker processes. Defaults to 0 (main-process loading, no "
+        "multiprocessing) -- Windows + multiprocessing dataloader workers segfaulted "
+        "mid-run during the first combined-dataset training attempt; single-process "
+        "loading trades some throughput for reliability.",
+    )
+    parser.add_argument(
+        "--resume",
+        default=None,
+        help="path to a last.pt checkpoint to resume an interrupted run from, instead "
+        "of starting fresh (ultralytics restores epoch count/optimizer state from the "
+        "run directory's own args.yaml) -- all other training args are ignored when set",
+    )
     parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument(
+        "--data-yaml",
+        default=None,
+        help="skip the Roboflow download entirely and train directly against an already-"
+        "prepared data.yaml (e.g. ml/datasets/combined-pcb-defects/data.yaml from "
+        "build_combined_dataset.py) -- --api-key/--workspace/--project/--version are ignored",
+    )
     args = parser.parse_args()
 
-    if not args.api_key:
-        sys.exit(
-            "ROBOFLOW_API_KEY not set. Get a free key at app.roboflow.com -> "
-            "Settings -> API Keys, then pass --api-key or set the env var."
-        )
+    if args.resume:
+        from ultralytics import YOLO
 
-    dest = ML_DIR / "datasets" / args.project
-    print(f"Downloading {args.workspace}/{args.project} v{args.version} -> {dest} ...")
-    data_dir = download_dataset(args.api_key, args.workspace, args.project, args.version, dest)
+        model = YOLO(args.resume)
+        results = model.train(resume=True)
+        best = Path(results.save_dir) / "weights" / "best.pt"
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(best, out_path)
+        print(f"Saved trained weights -> {out_path} ({out_path.stat().st_size} bytes)")
+        return
 
-    cfg = normalize_data_yaml(data_dir)
-    print("Classes in dataset:", cfg.get("names"))
+    if args.data_yaml:
+        data_dir = Path(args.data_yaml).resolve().parent
+        with open(args.data_yaml) as f:
+            cfg = yaml.safe_load(f)
+        print("Classes in dataset:", cfg.get("names"))
+    else:
+        if not args.api_key:
+            sys.exit(
+                "ROBOFLOW_API_KEY not set. Get a free key at app.roboflow.com -> "
+                "Settings -> API Keys, then pass --api-key or set the env var."
+            )
+
+        dest = ML_DIR / "datasets" / args.project
+        print(f"Downloading {args.workspace}/{args.project} v{args.version} -> {dest} ...")
+        data_dir = download_dataset(args.api_key, args.workspace, args.project, args.version, dest)
+
+        cfg = normalize_data_yaml(data_dir)
+        print("Classes in dataset:", cfg.get("names"))
 
     if args.download_only:
         return
@@ -145,6 +186,7 @@ def main():
         imgsz=args.imgsz,
         batch=args.batch,
         device=args.device,
+        workers=args.workers,
         project=str(ML_DIR / "runs"),
         name="pcb-defect",
         exist_ok=True,
