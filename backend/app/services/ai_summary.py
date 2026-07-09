@@ -20,6 +20,13 @@ from app.db.models import AIPrediction, Inspection
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
+_SYSTEM_PROMPT = (
+    "You are a PCB quality-assurance report writer. Be concise, factual, and "
+    "non-alarmist. Respond in plain prose only — no markdown, no headers, no "
+    "bold text, no bullet points, no asterisks."
+)
+
+
 def _build_prompt(preds: list[AIPrediction], notes: list[str]) -> str:
     real_preds = [p for p in preds if not p.is_reference_match]
     if not real_preds:
@@ -34,7 +41,7 @@ def _build_prompt(preds: list[AIPrediction], notes: list[str]) -> str:
         + f"\n\nValidation notes: {'; '.join(notes)}\n\n"
         "Write a 2-4 sentence plain-English QA report summary for a factory floor "
         "supervisor: state the verdict, the most severe defect type(s), and whether "
-        "immediate action is needed. No markdown, no bullet points, just prose."
+        "immediate action is needed."
     )
 
 
@@ -49,7 +56,7 @@ async def _call_llm(prompt: str) -> str | None:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a PCB quality-assurance report writer. Be concise, factual, and non-alarmist.",
+                        "content": _SYSTEM_PROMPT,
                     },
                     {"role": "user", "content": prompt},
                 ],
