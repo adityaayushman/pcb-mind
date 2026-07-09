@@ -66,6 +66,16 @@ export default function DashboardPage() {
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
+      {!stats && !error && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="h-6 w-6 border-2 border-neutral-700 border-t-brand-500 rounded-full animate-spin mb-4" />
+          <p className="text-neutral-400 text-sm">Loading your dashboard…</p>
+          <p className="text-neutral-600 text-xs mt-2 max-w-xs">
+            The free-tier server may take up to a minute to wake up if it&apos;s been idle.
+          </p>
+        </div>
+      )}
+
       {stats && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
