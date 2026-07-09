@@ -11,7 +11,6 @@ on every later request.
 import asyncio
 
 import cv2
-import httpx
 import numpy as np
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,11 +30,7 @@ async def get_or_generate_heatmap(db: AsyncSession, inspection: Inspection) -> s
     if not preds:
         return None
 
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get(inspection.image_url)
-        resp.raise_for_status()
-        image_bytes = resp.content
-
+    image_bytes = await storage.download_image(inspection.image_url)
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:

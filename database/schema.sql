@@ -37,7 +37,7 @@ create table golden_pcbs (
     id uuid primary key default uuid_generate_v4(),
     template_id uuid not null references pcb_templates(id) on delete cascade,
     image_url text not null,           -- Supabase Storage path
-    component_map jsonb,               -- expected component positions/labels
+    component_map jsonb,               -- baseline defect detections from golden image (YOLO run at upload time), for spatial suppression at inspection time
     version int not null default 1,
     created_at timestamptz not null default now()
 );
@@ -60,6 +60,8 @@ create table inspections (
     defect_count int not null default 0,
     inference_time_ms int,
     report_url text,                   -- generated PDF
+    ai_summary text,                   -- LLM-generated plain-English QA summary
+    registration_status text,          -- 'no_golden' | 'registered' | 'insufficient_features'
     created_at timestamptz not null default now(),
     completed_at timestamptz
 );

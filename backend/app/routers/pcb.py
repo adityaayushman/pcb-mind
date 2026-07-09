@@ -5,10 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.security import get_current_user, require_role, CurrentUser
 from app.db.database import get_db
 from app.db.models import PCBTemplate, GoldenPCB
-from app.services import storage
+from app.services import ai_inference, storage
 
 router = APIRouter(prefix="/api/pcb-templates", tags=["pcb-templates"])
 
@@ -63,7 +64,24 @@ async def upload_golden_pcb(
     image_url = await asyncio.to_thread(
         storage.upload_image, contents, file.content_type or "image/jpeg", prefix="golden"
     )
-    golden = GoldenPCB(template_id=template_id, image_url=image_url, component_map=None)
+
+    # Run the same defect detector on the golden reference itself so its own
+    # detections become a baseline: anything the model also flags on a
+    # known-good board is very likely a false-positive/artifact, not a real
+    # defect (see ai_inference._suppress_golden_artifacts). Must go through
+    # asyncio.to_thread — a raw synchronous YOLO call here would block the
+    # event loop, the exact class of bug that caused a recurring 502 earlier
+    # in this project (see git history).
+    result = await asyncio.to_thread(ai_inference.run_inspection, contents)
+    component_map = {
+        "defects": [
+            {"defect_type": d.defect_type, "bbox": d.bbox, "confidence": d.confidence}
+            for d in result.detections
+        ],
+        "model_version": settings.MODEL_WEIGHTS_PATH,
+    }
+
+    golden = GoldenPCB(template_id=template_id, image_url=image_url, component_map=component_map)
     db.add(golden)
     await db.commit()
     await db.refresh(golden)

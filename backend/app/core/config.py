@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     INFERENCE_CONFIDENCE_THRESHOLD: float = 0.35
     MAX_UPLOAD_MB: int = 10
 
+    # AI — LLM report generation (via OpenRouter, OpenAI-compatible API)
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "anthropic/claude-haiku-4.5"
+
     # CORS
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 

@@ -48,6 +48,7 @@ export interface DefectPrediction {
   bounding_box: { x: number; y: number; width: number; height: number };
   confidence: number;
   severity: Severity;
+  is_reference_match: boolean;
 }
 
 export interface Inspection {
@@ -60,6 +61,9 @@ export interface Inspection {
   defect_count: number;
   inference_time_ms: number | null;
   report_url: string | null;
+  ai_summary: string | null;
+  registration_status: string | null;
+  validation_notes: string[];
   created_at: string;
   completed_at: string | null;
   predictions: DefectPrediction[];
@@ -121,6 +125,8 @@ export const api = {
   getReportUrl: (id: string) => apiGet<{ report_url: string }>(`/api/inspections/${id}/report`),
   getHeatmapUrl: (id: string) =>
     apiGet<{ heatmap_image_url: string | null }>(`/api/inspections/${id}/heatmap`),
+  getAiSummary: (id: string) =>
+    apiGet<{ ai_summary: string | null }>(`/api/inspections/${id}/ai-summary`),
   exportInspections: (format: "csv" | "xlsx") =>
     apiDownload(`/api/inspections/export?format=${format}`, `inspections.${format}`),
   listTemplates: () => apiGet<PcbTemplate[]>("/api/pcb-templates"),

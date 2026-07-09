@@ -1,4 +1,5 @@
 import asyncio
+import textwrap
 from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -17,6 +18,13 @@ async def get_or_generate_report(db: AsyncSession, inspection: Inspection) -> st
         await db.execute(select(AIPrediction).where(AIPrediction.inspection_id == inspection.id))
     ).scalars().all()
 
+    # Best-effort: a missing key or a failed LLM call must never break report
+    # generation, so get_or_generate_summary already swallows its own errors
+    # and returns None rather than raising.
+    from app.services.ai_summary import get_or_generate_summary
+
+    ai_summary = await get_or_generate_summary(db, inspection)
+
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -32,6 +40,16 @@ async def get_or_generate_report(db: AsyncSession, inspection: Inspection) -> st
     c.drawString(40, height - 135, f"Inference time: {inspection.inference_time_ms} ms")
 
     y = height - 165
+    if ai_summary:
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(40, y, "AI Summary")
+        y -= 20
+        c.setFont("Helvetica", 9)
+        for line in textwrap.wrap(ai_summary, 95):
+            c.drawString(40, y, line)
+            y -= 12
+        y -= 15
+
     c.setFont("Helvetica-Bold", 12)
     c.drawString(40, y, "Detected Defects")
     y -= 20

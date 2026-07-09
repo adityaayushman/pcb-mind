@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, ForeignKey, Integer, Numeric, DateTime, func
+from sqlalchemy import String, Text, ForeignKey, Integer, Numeric, DateTime, Boolean, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -70,6 +70,8 @@ class Inspection(Base):
     defect_count: Mapped[int] = mapped_column(Integer, default=0)
     inference_time_ms: Mapped[int | None] = mapped_column(Integer)
     report_url: Mapped[str | None] = mapped_column(Text)
+    ai_summary: Mapped[str | None] = mapped_column(Text)
+    registration_status: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -88,4 +90,5 @@ class AIPrediction(Base):
     component_label: Mapped[str | None] = mapped_column(String)
     bounding_box: Mapped[dict] = mapped_column(JSONB, nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    is_reference_match: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

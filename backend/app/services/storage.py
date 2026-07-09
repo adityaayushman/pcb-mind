@@ -1,4 +1,6 @@
 import uuid
+
+import httpx
 from supabase import create_client, Client
 
 from app.core.config import settings
@@ -30,3 +32,13 @@ def upload_report(pdf_bytes: bytes, inspection_id: str) -> str:
         path, pdf_bytes, {"content-type": "application/pdf"}
     )
     return client.storage.from_(settings.STORAGE_BUCKET).get_public_url(path)
+
+
+async def download_image(url: str) -> bytes:
+    """Re-fetches bytes for an already-uploaded image from its stored URL —
+    needed when the caller doesn't already have the bytes in memory (e.g.
+    pulling in a golden PCB's reference image at inspection time)."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(url)
+        resp.raise_for_status()
+        return resp.content

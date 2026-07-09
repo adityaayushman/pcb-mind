@@ -25,6 +25,8 @@ import torch
 from ultralytics import YOLO
 
 from app.core.config import settings
+from app.core.validation import validate
+from app.services import registration
 
 # This runs on small (often 512MB) hosts with no GPU — capping thread pools
 # avoids each library spinning up one thread per core, which costs real
@@ -76,6 +78,7 @@ class Detection:
     component_label: str | None
     bbox: dict  # {x, y, width, height} normalized 0-1
     confidence: float
+    is_reference_match: bool = False  # set true when it matches the golden PCB's own baseline (see _suppress_golden_artifacts)
 
 
 @dataclass
@@ -85,10 +88,9 @@ class InspectionResult:
     inference_time_ms: int = 0
     annotated_image: np.ndarray | None = None
     heatmap_image: np.ndarray | None = None
-
-    @property
-    def passed(self) -> bool:
-        return len(self.detections) == 0
+    passed: bool = True
+    validation_notes: list[str] = field(default_factory=list)
+    registration_status: str = "no_golden"
 
 
 _CLAHE_CLIP_LIMIT = 2.0
@@ -121,25 +123,43 @@ def _preprocess(image_bytes: bytes) -> np.ndarray:
     return img
 
 
-def _diff_against_golden(detections: list[Detection], component_map: dict | None) -> list[Detection]:
-    """Flags components present in the golden reference but absent in the
-    detected set. Vestigial for the bare-board-fabrication taxonomy (it
-    modeled assembly-defect diffing) and currently dead in practice —
-    `component_map` is never populated — but kept enum-safe rather than
-    ripped out, since GoldenPCB is still a live DB table/route."""
-    if not component_map:
+_GOLDEN_MATCH_IOU_THRESHOLD = 0.3
+
+
+def _suppress_golden_artifacts(
+    detections: list[Detection],
+    golden_baseline: dict | None,
+    homography: np.ndarray | None,
+    img_size: int,
+) -> list[Detection]:
+    """Flags (does not remove) detections that spatially match a defect
+    already present on the golden reference board's own baseline — likely a
+    known false-positive/artifact (e.g. a silkscreen mark the model
+    consistently misfires on) rather than a genuine new defect, since the
+    golden board is supposed to be defect-free. Replaces the old
+    `_diff_against_golden`, which modeled assembly component-presence
+    diffing this bare-board-fabrication model was never trained for and
+    was permanently dead (`component_map` was never populated).
+
+    Matches are kept in the returned list with `is_reference_match=True`
+    rather than dropped, so a QA reviewer can still audit what got
+    suppressed from the pass/fail verdict and defect_count — see
+    schemas/inspection.py's `validation_notes` and defect_count in
+    routers/inspection.py, which both exclude reference matches."""
+    if not golden_baseline or homography is None:
         return detections
-    detected_labels = {d.component_label for d in detections}
-    for expected in component_map.get("components", []):
-        if expected["label"] not in detected_labels:
-            detections.append(
-                Detection(
-                    defect_type="other",
-                    component_label=expected["label"],
-                    bbox=expected["bbox"],
-                    confidence=1.0,
-                )
-            )
+    baseline_defects = golden_baseline.get("defects", [])
+    if not baseline_defects:
+        return detections
+
+    for d in detections:
+        for bd in baseline_defects:
+            if bd["defect_type"] != d.defect_type:
+                continue
+            transformed_bbox = registration.transform_bbox_normalized(bd["bbox"], homography, img_size)
+            if registration.bbox_iou(d.bbox, transformed_bbox) >= _GOLDEN_MATCH_IOU_THRESHOLD:
+                d.is_reference_match = True
+                break
     return detections
 
 
@@ -178,7 +198,11 @@ def _build_heatmap(img: np.ndarray, detections: list[Detection]) -> np.ndarray |
     return cv2.addWeighted(img, 0.6, colorized, 0.4, 0)
 
 
-def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None) -> InspectionResult:
+def run_inspection(
+    image_bytes: bytes,
+    golden_component_map: dict | None = None,
+    golden_image_bytes: bytes | None = None,
+) -> InspectionResult:
     start = time.perf_counter()
 
     img = _preprocess(image_bytes)
@@ -206,11 +230,27 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
                 )
             )
 
-    detections = _diff_against_golden(detections, golden_component_map)
+    # Registration only aligns the golden image into the captured image's
+    # frame, to reconcile the golden's own baseline boxes for comparison —
+    # it never warps the captured image or the detections just computed
+    # above from it. See services/registration.py's module docstring for why.
+    registration_status = "no_golden"
+    if golden_image_bytes is not None:
+        golden_img = _preprocess(golden_image_bytes)
+        reg = registration.register_images(golden_img, img)
+        registration_status = reg.status
+        if reg.status == "registered":
+            detections = _suppress_golden_artifacts(
+                detections, golden_component_map, reg.homography, _INFERENCE_IMGSZ
+            )
+
+    real_defect_types = [d.defect_type for d in detections if not d.is_reference_match]
+    real_detections = [d for d in detections if not d.is_reference_match]
     overall_confidence = (
-        sum(d.confidence for d in detections) / len(detections) if detections else 1.0
+        sum(d.confidence for d in real_detections) / len(real_detections) if real_detections else 1.0
     )
     elapsed_ms = int((time.perf_counter() - start) * 1000)
+    verdict = validate(real_defect_types)
 
     # Release the model's raw tensors/results promptly rather than waiting
     # for Python's regular GC cycle — matters on memory-constrained hosts.
@@ -230,4 +270,7 @@ def run_inspection(image_bytes: bytes, golden_component_map: dict | None = None)
         inference_time_ms=elapsed_ms,
         annotated_image=None,
         heatmap_image=None,
+        passed=verdict.passed,
+        validation_notes=verdict.notes,
+        registration_status=registration_status,
     )

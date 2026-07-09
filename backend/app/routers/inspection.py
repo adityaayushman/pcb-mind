@@ -18,7 +18,10 @@ router = APIRouter(prefix="/api/inspections", tags=["inspections"])
 
 
 async def _process_inspection(
-    inspection_id: uuid.UUID, contents: bytes, golden_component_map: dict | None
+    inspection_id: uuid.UUID,
+    contents: bytes,
+    golden_component_map: dict | None,
+    golden_image_url: str | None,
 ) -> None:
     """Runs the actual (slow) inference after the HTTP response has already
     gone back to the client — a cold instance on a fractional-vCPU host can
@@ -28,8 +31,17 @@ async def _process_inspection(
     mid-inference; the frontend polls GET /{id} instead (see StagedProgress
     in the frontend) using the queued/processing states that already existed
     in the schema but were never actually used until now."""
+    golden_image_bytes = None
+    if golden_image_url:
+        try:
+            golden_image_bytes = await storage.download_image(golden_image_url)
+        except Exception:
+            golden_image_bytes = None  # degrades to registration_status="no_golden" for this run, same as not selecting one
+
     try:
-        result = await asyncio.to_thread(ai_inference.run_inspection, contents, golden_component_map)
+        result = await asyncio.to_thread(
+            ai_inference.run_inspection, contents, golden_component_map, golden_image_bytes
+        )
     except Exception:
         async with AsyncSessionLocal() as db:
             inspection = await db.get(Inspection, inspection_id)
@@ -45,8 +57,9 @@ async def _process_inspection(
             return
         inspection.status = "passed" if result.passed else "failed"
         inspection.overall_confidence = result.overall_confidence
-        inspection.defect_count = len(result.detections)
+        inspection.defect_count = sum(1 for d in result.detections if not d.is_reference_match)
         inspection.inference_time_ms = result.inference_time_ms
+        inspection.registration_status = result.registration_status
         inspection.completed_at = datetime.utcnow()
 
         for d in result.detections:
@@ -57,6 +70,7 @@ async def _process_inspection(
                     component_label=d.component_label,
                     bounding_box=d.bbox,
                     confidence=d.confidence,
+                    is_reference_match=d.is_reference_match,
                 )
             )
         await db.commit()
@@ -84,6 +98,7 @@ async def create_inspection(
     )
 
     golden_component_map = None
+    golden_image_url = None
     if golden_pcb_id:
         row = (
             await db.execute(
@@ -95,6 +110,7 @@ async def create_inspection(
         if not row or row[1] != user.organization_id:
             raise HTTPException(404, "Golden PCB not found")
         golden_component_map = row[0].component_map
+        golden_image_url = row[0].image_url
 
     # Return as soon as the upload is done — inference happens afterward, in
     # the background (see _process_inspection above).
@@ -110,7 +126,9 @@ async def create_inspection(
     await db.commit()
     await db.refresh(inspection)
 
-    background_tasks.add_task(_process_inspection, inspection.id, contents, golden_component_map)
+    background_tasks.add_task(
+        _process_inspection, inspection.id, contents, golden_component_map, golden_image_url
+    )
 
     return inspection
 
@@ -201,3 +219,23 @@ async def get_heatmap(
 
     url = await get_or_generate_heatmap(db, inspection)
     return {"heatmap_image_url": url}
+
+
+@router.get("/{inspection_id}/ai-summary")
+async def get_ai_summary(
+    inspection_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Generates (or returns cached) LLM-written QA summary. See services/ai_summary.py.
+    Returns ai_summary=None (not an error) if no OpenRouter key is configured
+    or the LLM call fails — this is a nice-to-have on top of the real
+    detection/report data, never a hard dependency for viewing an inspection."""
+    from app.services.ai_summary import get_or_generate_summary
+
+    inspection = await db.get(Inspection, inspection_id)
+    if not inspection or inspection.organization_id != user.organization_id:
+        raise HTTPException(404, "Inspection not found")
+
+    summary = await get_or_generate_summary(db, inspection)
+    return {"ai_summary": summary}

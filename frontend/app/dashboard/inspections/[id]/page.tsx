@@ -22,6 +22,8 @@ export default function InspectionDetailPage() {
   const [copiedLink, setCopiedLink] = useState<"report" | "image" | null>(null);
   const [heatmapUrl, setHeatmapUrl] = useState<string | null>(null);
   const [heatmapLoading, setHeatmapLoading] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
 
   useEffect(() => {
     api.getInspection(id).then(setInspection).catch((e) => setError(e.message));
@@ -56,6 +58,21 @@ export default function InspectionDetailPage() {
       setError(e instanceof Error ? e.message : "Failed to generate heatmap");
     } finally {
       setHeatmapLoading(false);
+    }
+  }
+
+  // Same on-demand pattern as the heatmap — an LLM call is real latency/cost,
+  // so it only runs when the user actually asks for it, not on every page view.
+  async function handleShowAiSummary() {
+    if (aiSummary) return;
+    setAiSummaryLoading(true);
+    try {
+      const { ai_summary } = await api.getAiSummary(id);
+      setAiSummary(ai_summary);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate AI summary");
+    } finally {
+      setAiSummaryLoading(false);
     }
   }
 
@@ -100,6 +117,16 @@ export default function InspectionDetailPage() {
           {inspection.status.toUpperCase()}
         </span>
       </div>
+
+      {inspection.validation_notes.length > 0 && (
+        <ul className="mb-6 space-y-1">
+          {inspection.validation_notes.map((note) => (
+            <li key={note} className="text-sm text-neutral-400">
+              · {note}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="flex items-center gap-2 mb-3">
         <button
@@ -157,12 +184,36 @@ export default function InspectionDetailPage() {
         </div>
       </div>
 
+      <div className="border border-neutral-800 rounded-xl p-5 mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-medium text-sm">AI Summary</h3>
+          {!aiSummary && (
+            <button
+              onClick={handleShowAiSummary}
+              disabled={aiSummaryLoading}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-neutral-700 hover:border-neutral-500 disabled:opacity-50 transition-colors"
+            >
+              {aiSummaryLoading ? "Generating…" : "Generate AI Summary"}
+            </button>
+          )}
+        </div>
+        {aiSummary ? (
+          <p className="text-sm text-neutral-300">{aiSummary}</p>
+        ) : (
+          <p className="text-sm text-neutral-500">
+            {aiSummaryLoading ? "Asking the AI to summarize this inspection…" : "Not generated yet."}
+          </p>
+        )}
+      </div>
+
       {sortedPredictions.length > 0 && (
         <div className="border border-neutral-800 rounded-xl overflow-hidden mb-8">
           {sortedPredictions.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between px-5 py-3 border-b border-neutral-800 last:border-0 text-sm"
+              className={`flex items-center justify-between px-5 py-3 border-b border-neutral-800 last:border-0 text-sm ${
+                p.is_reference_match ? "opacity-50" : ""
+              }`}
             >
               <span
                 className={`text-[10px] font-medium px-2 py-0.5 rounded uppercase ${SEVERITY_BADGE[p.severity]}`}
@@ -172,6 +223,9 @@ export default function InspectionDetailPage() {
               <span>{p.defect_type.replace("_", " ")}</span>
               <span className="text-neutral-500">{p.component_label ?? "—"}</span>
               <span>{Math.round(p.confidence * 100)}%</span>
+              {p.is_reference_match && (
+                <span className="text-[10px] text-neutral-500 italic">Reference match</span>
+              )}
             </div>
           ))}
         </div>
