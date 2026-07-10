@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -26,20 +26,53 @@ import { api, DashboardStats } from "@/lib/api";
 import { getDefectSeverity, SEVERITY_HEX } from "@/lib/severity";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
+import { LiveBadge } from "@/components/common/LiveBadge";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { StatusPill } from "@/components/common/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const REFRESH_MS = 20_000;
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canExport, setCanExport] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
 
   useEffect(() => {
-    api.getDashboard().then(setStats).catch((e) => setError(e.message));
+    let active = true;
+    let hasData = false;
+
+    const load = async () => {
+      try {
+        const data = await api.getDashboard();
+        if (!active) return;
+        hasData = true;
+        setStats(data);
+        setLastUpdated(new Date());
+        setError(null);
+      } catch (e) {
+        // Only surface an error on the very first load; a failed background
+        // refresh keeps the last-known data on screen rather than blanking it.
+        if (active && !hasData) setError(e instanceof Error ? e.message : "Failed to load");
+      }
+    };
+
+    load();
+    const id = setInterval(load, REFRESH_MS);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      active = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
+  useEffect(() => {
     api
       .getMe()
       .then((p) => setCanExport(p.role === "admin" || p.role === "qa_engineer"))
@@ -78,24 +111,29 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Quality signal across every board your team has inspected."
         actions={
-          canExport && stats ? (
+          stats ? (
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("csv")}
-                disabled={exporting !== null}
-              >
-                <Download /> {exporting === "csv" ? "Exporting…" : "CSV"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("xlsx")}
-                disabled={exporting !== null}
-              >
-                <Download /> {exporting === "xlsx" ? "Exporting…" : "Excel"}
-              </Button>
+              <LiveBadge lastUpdated={lastUpdated} />
+              {canExport && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport("csv")}
+                    disabled={exporting !== null}
+                  >
+                    <Download /> {exporting === "csv" ? "Exporting…" : "CSV"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport("xlsx")}
+                    disabled={exporting !== null}
+                  >
+                    <Download /> {exporting === "xlsx" ? "Exporting…" : "Excel"}
+                  </Button>
+                </>
+              )}
             </div>
           ) : undefined
         }
@@ -223,32 +261,36 @@ export default function DashboardPage() {
               {stats.recent.length === 0 ? (
                 <p className="p-8 text-center text-sm text-muted-foreground">No inspections yet.</p>
               ) : (
-                stats.recent.map((insp, i) => (
-                  <motion.div
-                    key={insp.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i * 0.04, 0.4), duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    <Link
-                      href={`/dashboard/inspections/${insp.id}`}
-                      className="group flex items-center gap-4 border-b border-border px-5 py-3.5 transition-colors last:border-0 hover:bg-surface-1"
+                <AnimatePresence initial={false}>
+                  {stats.recent.map((insp) => (
+                    <motion.div
+                      key={insp.id}
+                      layout
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, x: -12 }}
+                      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                     >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-mono text-sm tabular text-foreground">
-                          {new Date(insp.created_at).toLocaleString()}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {insp.defect_count} defect{insp.defect_count === 1 ? "" : "s"}
-                          {insp.overall_confidence != null &&
-                            ` · ${Math.round(insp.overall_confidence * 100)}% confidence`}
-                        </p>
-                      </div>
-                      <StatusPill status={insp.status} size="sm" />
-                      <ArrowRight className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-                    </Link>
-                  </motion.div>
-                ))
+                      <Link
+                        href={`/dashboard/inspections/${insp.id}`}
+                        className="group flex items-center gap-4 border-b border-border px-5 py-3.5 transition-colors last:border-0 hover:bg-surface-1"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-sm tabular text-foreground">
+                            {new Date(insp.created_at).toLocaleString()}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {insp.defect_count} defect{insp.defect_count === 1 ? "" : "s"}
+                            {insp.overall_confidence != null &&
+                              ` · ${Math.round(insp.overall_confidence * 100)}% confidence`}
+                          </p>
+                        </div>
+                        <StatusPill status={insp.status} size="sm" />
+                        <ArrowRight className="size-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+                      </Link>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               )}
             </Card>
           </div>

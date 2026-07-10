@@ -19,6 +19,7 @@ import { api, AnalyticsOut, PcbTemplate } from "@/lib/api";
 import { getDefectSeverity, SEVERITY_HEX } from "@/lib/severity";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
+import { LiveBadge } from "@/components/common/LiveBadge";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -46,8 +47,11 @@ function periodHint(current: number | null, previous: number | null, unit: strin
   return `${sign}${diff.toFixed(digits)}${unit} vs previous period`;
 }
 
+const REFRESH_MS = 30_000;
+
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<AnalyticsOut | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [templates, setTemplates] = useState<PcbTemplate[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
@@ -58,13 +62,34 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    api
-      .getAnalytics(days, templateId === "all" ? undefined : templateId)
-      .then((data) => {
+    let active = true;
+    let hasData = false;
+
+    const load = async () => {
+      try {
+        const data = await api.getAnalytics(days, templateId === "all" ? undefined : templateId);
+        if (!active) return;
+        hasData = true;
         setStats(data);
+        setLastUpdated(new Date());
         setError(null);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load analytics"));
+      } catch (e) {
+        if (active && !hasData) setError(e instanceof Error ? e.message : "Failed to load analytics");
+      }
+    };
+
+    // Reset to the skeleton when the filters change (a genuinely different
+    // query), but keep polling the current selection live otherwise.
+    setStats(null);
+    load();
+    const id = setInterval(load, REFRESH_MS);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      active = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [days, templateId]);
 
   const passRateData = stats?.daily_trend.map((d) => ({ date: d.date, pass_rate: d.pass_rate ?? 0 })) ?? [];
@@ -85,7 +110,8 @@ export default function AnalyticsPage() {
         title="Analytics"
         description="Trends across your inspection history — is quality improving or declining?"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {stats && <LiveBadge lastUpdated={lastUpdated} />}
             <Select value={templateId} onValueChange={setTemplateId}>
               <SelectTrigger className="w-48">
                 <SelectValue />
