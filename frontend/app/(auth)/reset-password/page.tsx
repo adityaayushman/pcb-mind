@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -42,47 +46,51 @@ export default function ResetPasswordPage() {
 
   if (done) {
     return (
-      <main className="max-w-sm mx-auto px-6 py-24">
-        <h1 className="text-2xl font-semibold mb-4">Password updated</h1>
-        <p className="text-neutral-400 text-sm">Taking you to your dashboard…</p>
-      </main>
+      <div className="text-center">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <CheckCircle2 className="size-6" />
+        </span>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Password updated</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Taking you to your dashboard…</p>
+      </div>
     );
   }
 
   if (!ready) {
     return (
-      <main className="max-w-sm mx-auto px-6 py-24">
-        <h1 className="text-2xl font-semibold mb-4">Reset your password</h1>
-        <p className="text-neutral-500 text-sm">
-          Waiting for the reset link's session — if you navigated here directly rather than from
-          the email link, request a new reset link instead.
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Reset your password</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Waiting for the reset link&apos;s session — if you navigated here directly rather than
+          from the email link, request a new reset link instead.
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="max-w-sm mx-auto px-6 py-24">
-      <h1 className="text-2xl font-semibold mb-8">Choose a new password</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="password"
-          placeholder="New password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2.5"
-        />
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors py-2.5 rounded-lg font-medium text-neutral-950"
-        >
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">Choose a new password</h1>
+
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="password">New password</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Updating…" : "Update password"}
-        </button>
+        </Button>
       </form>
-    </main>
+    </div>
   );
 }

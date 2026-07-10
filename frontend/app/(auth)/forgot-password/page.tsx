@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { MailCheck } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -24,41 +28,48 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <main className="max-w-sm mx-auto px-6 py-24">
-        <h1 className="text-2xl font-semibold mb-4">Check your email</h1>
-        <p className="text-neutral-400 text-sm">
-          If an account exists for <span className="text-neutral-100">{email}</span>, we sent a
+      <div className="text-center">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <MailCheck className="size-6" />
+        </span>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Check your email</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          If an account exists for <span className="text-foreground">{email}</span>, we sent a
           password reset link to it.
         </p>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="max-w-sm mx-auto px-6 py-24">
-      <h1 className="text-2xl font-semibold mb-8">Reset your password</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2.5"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors py-2.5 rounded-lg font-medium text-neutral-950"
-        >
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight">Reset your password</h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        We&apos;ll email you a link to set a new one.
+      </p>
+
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Sending…" : "Send reset link"}
-        </button>
+        </Button>
       </form>
-      <p className="text-sm text-neutral-500 mt-6">
-        <Link href="/login" className="text-brand-500 hover:underline">
+
+      <p className="mt-6 text-sm text-muted-foreground">
+        <Link href="/login" className="text-primary hover:underline">
           Back to sign in
         </Link>
       </p>
-    </main>
+    </div>
   );
 }

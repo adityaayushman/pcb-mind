@@ -1,8 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+import { UploadCloud, X, ScanLine } from "lucide-react";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { StagedProgress } from "./StagedProgress";
 
 export function UploadForm({ templates }: { templates: { id: string; name: string }[] }) {
@@ -10,15 +21,26 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [apiDone, setApiDone] = useState(false);
   const [resultId, setResultId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0] ?? null;
+  const acceptFile = useCallback((f: File | null) => {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Please choose an image file.");
+      return;
+    }
+    setError(null);
     setFile(f);
-    setPreview(f ? URL.createObjectURL(f) : null);
+    setPreview(URL.createObjectURL(f));
+  }, []);
+
+  function clearFile() {
+    setFile(null);
+    setPreview(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,40 +61,82 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-lg">
-      <div>
-        <label className="block text-sm text-neutral-400 mb-2">PCB Template</label>
-        <select
-          value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
-          disabled={loading}
-          className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-2.5 disabled:opacity-50"
-        >
-          {templates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
+    <form onSubmit={handleSubmit} className="max-w-xl space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="template-select">PCB template</Label>
+        <Select value={templateId} onValueChange={setTemplateId} disabled={loading}>
+          <SelectTrigger id="template-select">
+            <SelectValue placeholder="Choose a template" />
+          </SelectTrigger>
+          <SelectContent>
+            {templates.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <div>
-        <label className="block text-sm text-neutral-400 mb-2">PCB image</label>
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={handleFileChange}
-          disabled={loading}
-          className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-brand-500 file:text-neutral-950 file:font-medium disabled:opacity-50"
-        />
-        {preview && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="Preview" className="mt-4 rounded-lg max-h-64 object-contain" />
+      <div className="space-y-2">
+        <Label>PCB image</Label>
+        {preview ? (
+          <div className="relative overflow-hidden rounded-lg border border-border bg-surface-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="Board preview" className="mx-auto block max-h-72 object-contain" />
+            {!loading && (
+              <button
+                type="button"
+                onClick={clearFile}
+                className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
+                aria-label="Remove image"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+            {file && (
+              <p className="border-t border-border px-3 py-2 font-mono text-xs text-muted-foreground">
+                {file.name} · {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
+          </div>
+        ) : (
+          <label
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              acceptFile(e.dataTransfer.files?.[0] ?? null);
+            }}
+            className={cn(
+              "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-12 text-center transition-colors",
+              dragOver
+                ? "border-primary bg-primary/5"
+                : "border-border bg-surface-1/50 hover:border-muted-foreground/40 hover:bg-surface-1"
+            )}
+          >
+            <UploadCloud className="size-8 text-muted-foreground/60" />
+            <p className="text-sm text-foreground">
+              Drop a board photo here, or <span className="text-primary">browse</span>
+            </p>
+            <p className="text-xs text-muted-foreground">JPG or PNG · up to 10 MB</p>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              disabled={loading}
+              onChange={(e) => acceptFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
         )}
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {loading ? (
         <StagedProgress
@@ -80,13 +144,9 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
           onSettled={() => resultId && router.push(`/dashboard/inspections/${resultId}`)}
         />
       ) : (
-        <button
-          type="submit"
-          disabled={!file}
-          className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors px-6 py-2.5 rounded-lg font-medium text-neutral-950"
-        >
-          Run inspection
-        </button>
+        <Button type="submit" size="lg" disabled={!file}>
+          <ScanLine /> Run inspection
+        </Button>
       )}
     </form>
   );

@@ -1,17 +1,22 @@
+import { Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
 export default function ContactPage() {
   return (
-    <main className="max-w-2xl mx-auto px-6 py-20">
-      <h1 className="text-4xl font-semibold tracking-tight mb-4">Contact us</h1>
-      <p className="text-neutral-400 text-lg mb-10">
+    <main className="mx-auto max-w-2xl px-6 py-20">
+      <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Contact</p>
+      <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
+        Talk to us
+      </h1>
+      <p className="mt-4 text-muted-foreground md:text-lg">
         Questions about a Team or Enterprise plan, or want a walkthrough of the inspection
-        pipeline? Reach out and we'll get back to you.
+        pipeline? Reach out and we&apos;ll get back to you.
       </p>
-      <a
-        href="mailto:hello@pcbmind.ai"
-        className="inline-block bg-brand-500 hover:bg-brand-600 transition-colors px-6 py-3 rounded-lg font-medium text-neutral-950"
-      >
-        hello@pcbmind.ai
-      </a>
+      <Button size="lg" className="mt-10" asChild>
+        <a href="mailto:hello@pcbmind.ai">
+          <Mail /> hello@pcbmind.ai
+        </a>
+      </Button>
     </main>
   );
 }

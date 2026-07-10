@@ -1,3 +1,93 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * PCBMind AI — "instrumentation-grade" design tokens.
+ *
+ * Committed dark theme grounded in the PCB world: the ground is a near-black
+ * with a faint cool/green bias (dark FR-4 / a powered instrument screen), not
+ * pure grey, so it relates to the brand green rather than fighting it. The
+ * accent green (#12b76a) doubles as PCB solder-mask green. Semantic severity
+ * (critical/major/minor) is a SEPARATE system from the accent.
+ *
+ * Colors are HSL triples (shadcn convention: `hsl(var(--token))`).
+ */
+
+@layer base {
+  :root,
+  .dark {
+    /* Ground + surfaces — hue ~167 (green-cyan), very low saturation, dark. */
+    --background: 170 24% 5%;      /* app ground — dark FR-4 */
+    --surface-1: 168 18% 8%;       /* raised card */
+    --surface-2: 166 15% 11%;      /* higher card / hover */
+    --foreground: 160 12% 92%;     /* primary text, faint warm-green white */
+
+    --card: 168 18% 8%;
+    --card-foreground: 160 12% 92%;
+    --popover: 168 20% 7%;
+    --popover-foreground: 160 12% 92%;
+
+    /* Brand green = primary + PCB solder mask */
+    --primary: 152 82% 40%;        /* #12b76a family */
+    --primary-foreground: 170 40% 4%;
+
+    --secondary: 166 15% 13%;
+    --secondary-foreground: 160 12% 90%;
+
+    --muted: 166 12% 14%;
+    --muted-foreground: 158 8% 58%;
+
+    --accent: 166 15% 15%;
+    --accent-foreground: 160 12% 92%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 166 12% 16%;
+    --input: 166 12% 18%;
+    --ring: 152 82% 45%;
+
+    /* Semantic severity — deliberately distinct from the accent green. */
+    --severity-critical: 0 84% 60%;   /* #ef4444 */
+    --severity-major: 38 92% 50%;     /* #f59e0b */
+    --severity-minor: 48 96% 53%;     /* #facc15 */
+
+    --radius: 0.7rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Digits line up in columns wherever data is tabulated. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Faint PCB-trace grid the app ground can opt into behind hero areas. */
+  .bg-trace-grid {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.5) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

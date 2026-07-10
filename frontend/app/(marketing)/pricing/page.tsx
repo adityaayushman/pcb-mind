@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const TIERS = [
   {
@@ -37,40 +40,47 @@ const TIERS = [
 
 export default function PricingPage() {
   return (
-    <main className="max-w-5xl mx-auto px-6 py-20">
-      <h1 className="text-4xl font-semibold tracking-tight mb-4">Pricing</h1>
-      <p className="text-neutral-400 text-lg max-w-2xl mb-16">
-        Start free. Talk to us when you're ready to scale across your QA team.
+    <main className="mx-auto max-w-6xl px-6 py-20">
+      <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Pricing</p>
+      <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
+        Start free. Scale when your line does.
+      </h1>
+      <p className="mt-4 max-w-2xl text-muted-foreground md:text-lg">
+        Talk to us when you&apos;re ready to roll inspection out across your QA team.
       </p>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="mt-14 grid gap-4 md:grid-cols-3">
         {TIERS.map((tier) => (
           <div
             key={tier.name}
-            className={`rounded-xl p-6 border ${
-              tier.highlighted ? "border-brand-500 bg-neutral-900" : "border-neutral-800"
-            }`}
+            className={cn(
+              "relative flex flex-col rounded-lg border bg-card p-6",
+              tier.highlighted ? "border-primary/50 shadow-[0_0_40px_-12px_hsl(var(--primary)/0.35)]" : "border-border"
+            )}
           >
-            <h3 className="font-medium mb-1">{tier.name}</h3>
-            <p className="text-2xl font-semibold mb-3">{tier.price}</p>
-            <p className="text-sm text-neutral-400 mb-6">{tier.description}</p>
-            <ul className="space-y-2 mb-6">
+            {tier.highlighted && (
+              <span className="absolute -top-3 left-6 rounded-full bg-primary px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                Most popular
+              </span>
+            )}
+            <h3 className="font-medium">{tier.name}</h3>
+            <p className="mt-2 text-2xl font-semibold tracking-tight">{tier.price}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
+            <ul className="mt-6 flex-1 space-y-2.5">
               {tier.features.map((f) => (
-                <li key={f} className="text-sm text-neutral-300 flex items-start gap-2">
-                  <span className="text-brand-500">✓</span> {f}
+                <li key={f} className="flex items-start gap-2 text-sm">
+                  <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">{f}</span>
                 </li>
               ))}
             </ul>
-            <Link
-              href={tier.cta.href}
-              className={`block text-center px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                tier.highlighted
-                  ? "bg-brand-500 hover:bg-brand-600 text-neutral-950"
-                  : "border border-neutral-700 hover:border-neutral-500"
-              }`}
+            <Button
+              className="mt-6 w-full"
+              variant={tier.highlighted ? "default" : "outline"}
+              asChild
             >
-              {tier.cta.label}
-            </Link>
+              <Link href={tier.cta.href}>{tier.cta.label}</Link>
+            </Button>
           </div>
         ))}
       </div>

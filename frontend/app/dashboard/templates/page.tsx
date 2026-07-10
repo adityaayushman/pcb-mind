@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Layers, Plus, UploadCloud, CheckCircle2 } from "lucide-react";
 import { api, PcbTemplate } from "@/lib/api";
+import { PageContainer } from "@/components/common/PageContainer";
+import { SectionHeading } from "@/components/common/SectionHeading";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TemplatesPage() {
-  const [templates, setTemplates] = useState<PcbTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = useState<PcbTemplate[] | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [goldenFiles, setGoldenFiles] = useState<Record<string, File | null>>({});
   const [uploadingGolden, setUploadingGolden] = useState<string | null>(null);
   const [goldenUploaded, setGoldenUploaded] = useState<Record<string, boolean>>({});
@@ -18,9 +25,8 @@ export default function TemplatesPage() {
     try {
       setTemplates(await api.listTemplates());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load templates");
-    } finally {
-      setLoading(false);
+      toast.error(err instanceof Error ? err.message : "Failed to load templates");
+      setTemplates([]);
     }
   }
 
@@ -32,14 +38,14 @@ export default function TemplatesPage() {
     e.preventDefault();
     if (!name.trim()) return;
     setCreating(true);
-    setError(null);
     try {
       await api.createTemplate(name.trim(), description.trim() || undefined);
       setName("");
       setDescription("");
+      toast.success("Template created");
       await loadTemplates();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create template");
+      toast.error(err instanceof Error ? err.message : "Failed to create template");
     } finally {
       setCreating(false);
     }
@@ -49,93 +55,116 @@ export default function TemplatesPage() {
     const file = goldenFiles[templateId];
     if (!file) return;
     setUploadingGolden(templateId);
-    setError(null);
     try {
       await api.uploadGoldenPcb(templateId, file);
       setGoldenFiles((prev) => ({ ...prev, [templateId]: null }));
       setGoldenUploaded((prev) => ({ ...prev, [templateId]: true }));
+      toast.success("Golden PCB uploaded — baseline detection runs in the background");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload golden PCB");
+      toast.error(err instanceof Error ? err.message : "Failed to upload golden PCB");
     } finally {
       setUploadingGolden(null);
     }
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-6 py-12">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold">PCB templates</h1>
-      </div>
+    <PageContainer width="lg">
+      <SectionHeading
+        eyebrow="Reference library"
+        title="PCB templates"
+        description="Each template is a board design; its golden PCB is the known-good reference every inspection compares against."
+      />
 
-      <form
-        onSubmit={handleCreate}
-        className="space-y-4 max-w-lg mb-12 bg-neutral-900 border border-neutral-800 rounded-xl p-6"
-      >
-        <h2 className="text-lg font-medium">Create a template</h2>
-        <div>
-          <label className="block text-sm text-neutral-400 mb-2">Name</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder="e.g. Main Control Board Rev C"
-            className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5"
-          />
-        </div>
-        <div>
-          <label className="block text-sm text-neutral-400 mb-2">Description (optional)</label>
-          <input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Notes for your team"
-            className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5"
-          />
-        </div>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={creating || !name.trim()}
-          className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 transition-colors px-6 py-2.5 rounded-lg font-medium text-neutral-950"
-        >
-          {creating ? "Creating…" : "Create template"}
-        </button>
-      </form>
-
-      <h2 className="text-lg font-medium mb-4">Existing templates</h2>
-      {loading ? (
-        <p className="text-neutral-500 text-sm">Loading…</p>
-      ) : templates.length === 0 ? (
-        <p className="text-neutral-500 text-sm">No templates yet — create one above.</p>
-      ) : (
-        <div className="space-y-4">
-          {templates.map((t) => (
-            <div key={t.id} className="border border-neutral-800 rounded-xl p-5">
-              <p className="font-medium">{t.name}</p>
-              {t.description && <p className="text-sm text-neutral-500 mb-3">{t.description}</p>}
-              <div className="flex items-center gap-3 mt-3">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setGoldenFiles((prev) => ({ ...prev, [t.id]: e.target.files?.[0] ?? null }))
-                  }
-                  className="text-sm text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-neutral-800 file:text-neutral-100"
-                />
-                <button
-                  onClick={() => handleGoldenUpload(t.id)}
-                  disabled={!goldenFiles[t.id] || uploadingGolden === t.id}
-                  className="bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 transition-colors px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
-                >
-                  {uploadingGolden === t.id ? "Uploading…" : "Upload Golden PCB"}
-                </button>
-                {goldenUploaded[t.id] && (
-                  <span className="text-brand-500 text-sm">Uploaded ✓</span>
-                )}
-              </div>
+      <Card className="mt-8 max-w-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Plus className="size-4 text-primary" /> Create a template
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tpl-name">Name</Label>
+              <Input
+                id="tpl-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                placeholder="e.g. Main Control Board Rev C"
+              />
             </div>
-          ))}
-        </div>
-      )}
-    </main>
+            <div className="space-y-2">
+              <Label htmlFor="tpl-desc">Description (optional)</Label>
+              <Input
+                id="tpl-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Notes for your team"
+              />
+            </div>
+            <Button type="submit" disabled={creating || !name.trim()}>
+              {creating ? "Creating…" : "Create template"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <div className="mt-10">
+        <h2 className="mb-4 flex items-center gap-2 text-sm font-medium">
+          <Layers className="size-4 text-muted-foreground" /> Existing templates
+        </h2>
+
+        {templates === null ? (
+          <div className="space-y-3">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+        ) : templates.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border bg-surface-1/50 px-6 py-10 text-center text-sm text-muted-foreground">
+            No templates yet — create one above.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {templates.map((t) => (
+              <Card key={t.id} className="p-5">
+                <p className="font-medium">{t.name}</p>
+                {t.description && (
+                  <p className="mt-0.5 text-sm text-muted-foreground">{t.description}</p>
+                )}
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground">
+                    <UploadCloud className="size-4" />
+                    <span className="max-w-44 truncate">
+                      {goldenFiles[t.id]?.name ?? "Choose golden board image"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={(e) =>
+                        setGoldenFiles((prev) => ({ ...prev, [t.id]: e.target.files?.[0] ?? null }))
+                      }
+                    />
+                  </label>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleGoldenUpload(t.id)}
+                    disabled={!goldenFiles[t.id] || uploadingGolden === t.id}
+                  >
+                    {uploadingGolden === t.id ? "Uploading…" : "Upload golden PCB"}
+                  </Button>
+                  {goldenUploaded[t.id] && (
+                    <span className="inline-flex items-center gap-1 text-sm text-primary">
+                      <CheckCircle2 className="size-4" /> Uploaded
+                    </span>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </PageContainer>
   );
 }

@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import { Toaster } from "@/components/ui/sonner";
+import { cn } from "@/lib/utils";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,8 +12,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="bg-neutral-950 text-neutral-100 antialiased min-h-screen">{children}</body>
+    <html lang="en" className={cn("dark", GeistSans.variable, GeistMono.variable)}>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

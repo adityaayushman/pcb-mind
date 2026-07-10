@@ -82,19 +82,43 @@ export function StagedProgress({ done, onSettled }: { done: boolean; onSettled: 
   const stage = STAGES[Math.min(stageIndex, STAGES.length - 1)];
 
   return (
-    <div className="space-y-2">
+    <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-neutral-300">{stage.label}…</span>
-        <span className="text-neutral-500">{Math.round(progress)}%</span>
+        <span className="flex items-center gap-2 text-foreground">
+          <span className="relative flex size-2">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
+            <span className="relative inline-flex size-2 rounded-full bg-primary" />
+          </span>
+          {stage.label}…
+        </span>
+        <span className="font-mono text-xs tabular text-muted-foreground">
+          {Math.round(progress)}%
+        </span>
       </div>
-      <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full bg-brand-500 transition-all duration-150 ease-linear"
+          className="h-full rounded-full bg-primary transition-all duration-150 ease-linear"
           style={{ width: `${progress}%` }}
         />
       </div>
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1">
+        {STAGES.map((s, i) => (
+          <span
+            key={s.label}
+            className={
+              i < stageIndex
+                ? "font-mono text-[10px] uppercase tracking-wide text-primary"
+                : i === stageIndex
+                  ? "font-mono text-[10px] uppercase tracking-wide text-foreground"
+                  : "font-mono text-[10px] uppercase tracking-wide text-muted-foreground/50"
+            }
+          >
+            {s.label}
+          </span>
+        ))}
+      </div>
       {showReassurance && (
-        <p className="text-xs text-neutral-500">
+        <p className="mt-3 text-xs text-muted-foreground">
           Still working — the free-tier server can take up to a minute after being idle.
         </p>
       )}
