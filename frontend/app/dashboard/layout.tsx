@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, GraduationCap, ScanBarcode, ShieldAlert, LogOut, Settings, Users, User } from "lucide-react";
+import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, GraduationCap, ScanBarcode, ShieldAlert, ChevronDown, LogOut, Settings, Users, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -19,16 +19,39 @@ import {
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
 
-const NAV_LINKS = [
+type NavLink = { href: string; label: string; icon: typeof LayoutDashboard };
+type NavGroup = { label: string; icon: typeof LayoutDashboard; items: NavLink[] };
+type NavItem = NavLink | NavGroup;
+
+const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/templates", label: "Templates", icon: Layers },
-  { href: "/dashboard/traceability", label: "Traceability", icon: ScanBarcode },
   { href: "/dashboard/upload", label: "New inspection", icon: ScanLine },
-  { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp },
-  { href: "/dashboard/process-control", label: "Process control", icon: ShieldAlert },
-  { href: "/dashboard/training", label: "Training", icon: GraduationCap },
+  {
+    label: "Library",
+    icon: Layers,
+    items: [
+      { href: "/dashboard/templates", label: "Templates", icon: Layers },
+      { href: "/dashboard/traceability", label: "Traceability", icon: ScanBarcode },
+    ],
+  },
+  {
+    label: "Insights",
+    icon: TrendingUp,
+    items: [
+      { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp },
+      { href: "/dashboard/process-control", label: "Process control", icon: ShieldAlert },
+      { href: "/dashboard/training", label: "Training", icon: GraduationCap },
+    ],
+  },
   { href: "/dashboard/copilot", label: "Copilot", icon: Sparkles },
 ];
+
+// Flattened destinations for the mobile bar (it scrolls, so no grouping needed).
+const MOBILE_LINKS: NavLink[] = NAV.flatMap((n) => ("items" in n ? n.items : [n]));
+
+const NAV_ITEM = "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors";
+const NAV_ACTIVE = "bg-surface-2 font-medium text-foreground";
+const NAV_IDLE = "text-muted-foreground hover:bg-surface-1 hover:text-foreground";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
@@ -100,22 +123,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </span>
             </Link>
             <nav className="hidden items-center gap-1 sm:flex">
-              {NAV_LINKS.map((link) => {
-                const active = pathname === link.href;
-                const Icon = link.icon;
+              {NAV.map((item) => {
+                if ("items" in item) {
+                  const active = item.items.some((i) => pathname === i.href);
+                  const Icon = item.icon;
+                  return (
+                    <DropdownMenu key={item.label}>
+                      <DropdownMenuTrigger asChild>
+                        <button className={cn(NAV_ITEM, active ? NAV_ACTIVE : NAV_IDLE)}>
+                          <Icon className="size-4" />
+                          {item.label}
+                          <ChevronDown className="size-3.5 opacity-50" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        {item.items.map((sub) => {
+                          const SubIcon = sub.icon;
+                          return (
+                            <DropdownMenuItem asChild key={sub.href}>
+                              <Link
+                                href={sub.href}
+                                className={cn(pathname === sub.href && "text-foreground")}
+                              >
+                                <SubIcon /> {sub.label}
+                              </Link>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
+                }
+                const active = pathname === item.href;
+                const Icon = item.icon;
                 return (
                   <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
-                      active
-                        ? "bg-surface-2 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-surface-1 hover:text-foreground"
-                    )}
+                    key={item.href}
+                    href={item.href}
+                    className={cn(NAV_ITEM, active ? NAV_ACTIVE : NAV_IDLE)}
                   >
                     <Icon className="size-4" />
-                    {link.label}
+                    {item.label}
                   </Link>
                 );
               })}
@@ -153,9 +201,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </DropdownMenu>
           </div>
         </div>
-        {/* Mobile nav */}
+        {/* Mobile nav — flat, horizontally scrollable */}
         <nav className="flex items-center gap-1 overflow-x-auto border-t border-border px-4 py-2 sm:hidden">
-          {NAV_LINKS.map((link) => {
+          {MOBILE_LINKS.map((link) => {
             const active = pathname === link.href;
             return (
               <Link
