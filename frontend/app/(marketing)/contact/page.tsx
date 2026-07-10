@@ -13,8 +13,8 @@ export default function ContactPage() {
         pipeline? Reach out and we&apos;ll get back to you.
       </p>
       <Button size="lg" className="mt-10" asChild>
-        <a href="mailto:hello@pcbmind.ai">
-          <Mail /> hello@pcbmind.ai
+        <a href="mailto:adityaasahoo@gmail.com">
+          <Mail /> adityaasahoo@gmail.com
         </a>
       </Button>
     </main>
