@@ -58,7 +58,7 @@ export default function AnalyticsPage() {
   const [templateId, setTemplateId] = useState("all");
 
   useEffect(() => {
-    api.listTemplates().then(setTemplates).catch(() => {});
+    api.listTemplates(undefined, 1000).then(setTemplates).catch(() => {});
   }, []);
 
   useEffect(() => {

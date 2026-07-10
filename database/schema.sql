@@ -8,6 +8,7 @@ create extension if not exists "uuid-ossp";
 create table organizations (
     id uuid primary key default uuid_generate_v4(),
     name text not null,
+    plan text not null default 'free',  -- free | pro | enterprise (see app/core/plans.py)
     created_at timestamptz not null default now()
 );
 

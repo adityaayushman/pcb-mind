@@ -3,13 +3,14 @@ import uuid
 from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.security import get_current_user, require_role, CurrentUser
+from app.core.plans import plan_config
 from app.db.database import get_db, AsyncSessionLocal
-from app.db.models import PCBTemplate, GoldenPCB
+from app.db.models import PCBTemplate, GoldenPCB, Organization
 from app.services import ai_inference, storage
 
 router = APIRouter(prefix="/api/pcb-templates", tags=["pcb-templates"])
@@ -40,6 +41,19 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
     user: CurrentUser = Depends(require_role("admin", "qa_engineer")),
 ):
+    org = await db.get(Organization, user.organization_id)
+    limit = plan_config(org.plan if org else None)["max_templates"]
+    count = await db.scalar(
+        select(func.count())
+        .select_from(PCBTemplate)
+        .where(PCBTemplate.organization_id == user.organization_id)
+    )
+    if (count or 0) >= limit:
+        raise HTTPException(
+            403,
+            f"Your plan allows up to {limit} templates. Upgrade to add more.",
+        )
+
     template = PCBTemplate(
         organization_id=user.organization_id, name=name, description=description, created_by=user.id
     )
@@ -49,15 +63,7 @@ async def create_template(
     return template
 
 
-async def _latest_golden(db: AsyncSession, template_id: uuid.UUID) -> GoldenPcbOut | None:
-    golden = (
-        await db.execute(
-            select(GoldenPCB)
-            .where(GoldenPCB.template_id == template_id)
-            .order_by(GoldenPCB.created_at.desc())
-            .limit(1)
-        )
-    ).scalar_one_or_none()
+def _golden_out(golden: GoldenPCB | None) -> GoldenPcbOut | None:
     if not golden:
         return None
     return GoldenPcbOut(
@@ -71,18 +77,47 @@ async def _latest_golden(db: AsyncSession, template_id: uuid.UUID) -> GoldenPcbO
 
 @router.get("", response_model=list[TemplateOut])
 async def list_templates(
-    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+    search: str | None = None,
+    limit: int = 60,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
 ):
-    templates = (
-        await db.execute(select(PCBTemplate).where(PCBTemplate.organization_id == user.organization_id))
-    ).scalars().all()
+    """List the org's templates, optionally filtered by a name/description
+    search. Capped by `limit` (and paired with a single batched golden-PCB
+    lookup) so a library of thousands of templates doesn't return everything
+    at once or fan out into an N+1 query per row."""
+    limit = max(1, min(limit, 1000))
+
+    query = select(PCBTemplate).where(PCBTemplate.organization_id == user.organization_id)
+    if search and search.strip():
+        pattern = f"%{search.strip()}%"
+        query = query.where(
+            or_(PCBTemplate.name.ilike(pattern), PCBTemplate.description.ilike(pattern))
+        )
+    query = query.order_by(PCBTemplate.name.asc()).limit(limit)
+    templates = (await db.execute(query)).scalars().all()
+
+    # One query for the latest golden PCB across all returned templates,
+    # instead of a per-template lookup.
+    latest: dict[uuid.UUID, GoldenPCB] = {}
+    ids = [t.id for t in templates]
+    if ids:
+        rows = (
+            await db.execute(
+                select(GoldenPCB)
+                .where(GoldenPCB.template_id.in_(ids))
+                .order_by(GoldenPCB.created_at.desc())
+            )
+        ).scalars().all()
+        for g in rows:
+            latest.setdefault(g.template_id, g)  # first seen = newest (desc order)
 
     return [
         TemplateOut(
             id=t.id,
             name=t.name,
             description=t.description,
-            golden_pcb=await _latest_golden(db, t.id),
+            golden_pcb=_golden_out(latest.get(t.id)),
         )
         for t in templates
     ]

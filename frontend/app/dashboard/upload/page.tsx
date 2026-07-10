@@ -14,7 +14,7 @@ export default function UploadPage() {
   const [templates, setTemplates] = useState<{ id: string; name: string }[] | null>(null);
 
   useEffect(() => {
-    api.listTemplates().then(setTemplates).catch(() => setTemplates([]));
+    api.listTemplates(undefined, 1000).then(setTemplates).catch(() => setTemplates([]));
   }, []);
 
   return (

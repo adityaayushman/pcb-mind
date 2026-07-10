@@ -118,6 +118,7 @@ export interface PcbTemplate {
 }
 
 export type Role = "admin" | "qa_engineer" | "operator";
+export type Plan = "free" | "pro" | "enterprise";
 
 export interface Profile {
   id: string;
@@ -126,6 +127,11 @@ export interface Profile {
   role: Role;
   organization_id: string | null;
   organization_name: string | null;
+  plan: Plan;
+  plan_label: string;
+  template_count: number;
+  template_limit: number;
+  inspections_per_month: number;
 }
 
 export interface TeamMember {
@@ -226,7 +232,13 @@ export const api = {
     apiGet<{ ai_summary: string | null }>(`/api/inspections/${id}/ai-summary`),
   exportInspections: (format: "csv" | "xlsx") =>
     apiDownload(`/api/inspections/export?format=${format}`, `inspections.${format}`),
-  listTemplates: () => apiGet<PcbTemplate[]>("/api/pcb-templates"),
+  listTemplates: (search?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (limit != null) params.set("limit", String(limit));
+    const qs = params.toString();
+    return apiGet<PcbTemplate[]>(`/api/pcb-templates${qs ? `?${qs}` : ""}`);
+  },
   createTemplate: (name: string, description?: string) => {
     const form = new FormData();
     form.append("name", name);
@@ -249,6 +261,7 @@ export const api = {
     apiPost<Profile>("/api/auth/bootstrap", { full_name, organization_name }),
   updateProfile: (full_name: string) => apiPatch<Profile>("/api/auth/me", { full_name }),
   updateOrganization: (name: string) => apiPatch<Profile>("/api/auth/organization", { name }),
+  updatePlan: (plan: Plan) => apiPatch<Profile>("/api/auth/plan", { plan }),
   getTeam: () => apiGet<TeamMember[]>("/api/team"),
   updateMemberRole: (memberId: string, role: Role) =>
     apiPatch<TeamMember>(`/api/team/${memberId}`, { role }),

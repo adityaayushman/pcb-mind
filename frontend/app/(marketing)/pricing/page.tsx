@@ -3,33 +3,56 @@ import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// Quotas mirror backend/app/core/plans.py — kept in sync by hand (small,
+// rarely-changing) so this marketing page states exactly what each tier grants.
 const TIERS = [
   {
-    name: "Starter",
-    price: "Free",
-    description: "For trying PCBMind AI on a single production line.",
-    features: ["1 organization", "Up to 3 PCB templates", "Unlimited inspections", "PDF reports"],
+    name: "Free",
+    price: "$0",
+    cadence: "forever",
+    description: "For a single engineer trying PCBMind on a line.",
+    quota: [
+      { label: "Starter templates seeded", value: "5" },
+      { label: "PCB templates", value: "Up to 15" },
+      { label: "Inspections / month", value: "50" },
+      { label: "Golden versions per board", value: "1" },
+    ],
+    features: ["AI defect detection", "Golden-board comparison", "PDF reports"],
     cta: { label: "Start free", href: "/register" },
   },
   {
-    name: "Team",
-    price: "Contact us",
-    description: "For QA teams running inspections across multiple lines.",
+    name: "Pro",
+    price: "$149",
+    cadence: "per month",
+    description: "For a QA team running continuous inspection.",
+    quota: [
+      { label: "Starter templates seeded", value: "40" },
+      { label: "PCB templates", value: "Up to 300" },
+      { label: "Inspections / month", value: "2,000" },
+      { label: "Golden versions per board", value: "10" },
+    ],
     features: [
-      "Unlimited PCB templates",
-      "Role-based access (admin / QA engineer / operator)",
-      "CSV & Excel export",
+      "Everything in Free",
+      "Role-based access (admin / QA / operator)",
+      "Analytics, Copilot & CSV/Excel export",
       "Priority support",
     ],
-    cta: { label: "Talk to us", href: "/contact" },
+    cta: { label: "Start free", href: "/register" },
     highlighted: true,
   },
   {
     name: "Enterprise",
-    price: "Contact us",
-    description: "For manufacturers with compliance and integration needs.",
+    price: "Custom",
+    cadence: "contact us",
+    description: "For multi-line factories with unlimited scale.",
+    quota: [
+      { label: "Starter templates seeded", value: "150" },
+      { label: "PCB templates", value: "Unlimited" },
+      { label: "Inspections / month", value: "Unlimited" },
+      { label: "Golden versions per board", value: "100" },
+    ],
     features: [
-      "Everything in Team",
+      "Everything in Pro",
       "Custom retention & data residency",
       "SSO (coming soon)",
       "Dedicated onboarding",
@@ -64,9 +87,23 @@ export default function PricingPage() {
               </span>
             )}
             <h3 className="font-medium">{tier.name}</h3>
-            <p className="mt-2 text-2xl font-semibold tracking-tight">{tier.price}</p>
+            <p className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-3xl font-semibold tracking-tight">{tier.price}</span>
+              <span className="text-xs text-muted-foreground">{tier.cadence}</span>
+            </p>
             <p className="mt-2 text-sm text-muted-foreground">{tier.description}</p>
-            <ul className="mt-6 flex-1 space-y-2.5">
+
+            {/* What you get — the concrete data limits per plan */}
+            <dl className="mt-6 space-y-2 rounded-md border border-border bg-surface-1/50 p-3">
+              {tier.quota.map((q) => (
+                <div key={q.label} className="flex items-center justify-between gap-3 text-sm">
+                  <dt className="text-muted-foreground">{q.label}</dt>
+                  <dd className="font-mono font-medium tabular">{q.value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            <ul className="mt-5 flex-1 space-y-2.5">
               {tier.features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm">
                   <Check className="mt-0.5 size-4 shrink-0 text-primary" />

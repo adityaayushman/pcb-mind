@@ -129,24 +129,35 @@ async def get_defect_frequency(db: AsyncSession, org_id: uuid.UUID, days: int | 
     }
 
 
-async def list_templates(db: AsyncSession, org_id: uuid.UUID) -> list[dict]:
+async def list_templates(db: AsyncSession, org_id: uuid.UUID) -> dict:
+    total = await db.scalar(
+        select(func.count()).select_from(PCBTemplate).where(PCBTemplate.organization_id == org_id)
+    )
+    # Cap the rows returned to the LLM — an org can hold thousands of
+    # templates and dumping them all would blow the context window.
     rows = (
         await db.execute(
             select(PCBTemplate, func.count(GoldenPCB.id))
             .outerjoin(GoldenPCB, GoldenPCB.template_id == PCBTemplate.id)
             .where(PCBTemplate.organization_id == org_id)
             .group_by(PCBTemplate.id)
+            .order_by(PCBTemplate.name)
+            .limit(50)
         )
     ).all()
-    return [
-        {
-            "template_id": str(t.id),
-            "name": t.name,
-            "description": t.description,
-            "has_golden_pcb": golden_count > 0,
-        }
-        for t, golden_count in rows
-    ]
+    return {
+        "total_templates": total or 0,
+        "showing": len(rows),
+        "templates": [
+            {
+                "template_id": str(t.id),
+                "name": t.name,
+                "description": t.description,
+                "has_golden_pcb": golden_count > 0,
+            }
+            for t, golden_count in rows
+        ],
+    }
 
 
 TOOL_FUNCTIONS = {

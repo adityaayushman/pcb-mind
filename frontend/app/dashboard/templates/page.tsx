@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Layers, Plus, UploadCloud, CheckCircle2, Clock } from "lucide-react";
-import { api, PcbTemplate } from "@/lib/api";
+import { Layers, Plus, UploadCloud, CheckCircle2, Clock, Search } from "lucide-react";
+import { api, PcbTemplate, Profile } from "@/lib/api";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
 import { Button } from "@/components/ui/button";
@@ -12,26 +12,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const PAGE_LIMIT = 60;
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<PcbTemplate[] | null>(null);
+  const [me, setMe] = useState<Profile | null>(null);
+  const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [creating, setCreating] = useState(false);
   const [goldenFiles, setGoldenFiles] = useState<Record<string, File | null>>({});
   const [uploadingGolden, setUploadingGolden] = useState<string | null>(null);
 
-  async function loadTemplates() {
+  const loadTemplates = useCallback(async (q: string) => {
     try {
-      setTemplates(await api.listTemplates());
+      setTemplates(await api.listTemplates(q || undefined, PAGE_LIMIT));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load templates");
       setTemplates([]);
     }
-  }
+  }, []);
+
+  const refreshUsage = useCallback(() => {
+    api.getMe().then(setMe).catch(() => {});
+  }, []);
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    refreshUsage();
+  }, [refreshUsage]);
+
+  // Debounce the search so we hit the API once the user pauses, not per keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => loadTemplates(search.trim()), 300);
+    return () => clearTimeout(id);
+  }, [search, loadTemplates]);
+
+  const atLimit = me != null && me.template_count >= me.template_limit;
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -42,7 +58,8 @@ export default function TemplatesPage() {
       setName("");
       setDescription("");
       toast.success("Template created");
-      await loadTemplates();
+      await loadTemplates(search.trim());
+      refreshUsage();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create template");
     } finally {
@@ -58,7 +75,7 @@ export default function TemplatesPage() {
       await api.uploadGoldenPcb(templateId, file);
       setGoldenFiles((prev) => ({ ...prev, [templateId]: null }));
       toast.success("Golden PCB uploaded — baseline detection runs in the background");
-      await loadTemplates();
+      await loadTemplates(search.trim());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to upload golden PCB");
     } finally {
@@ -72,6 +89,17 @@ export default function TemplatesPage() {
         eyebrow="Reference library"
         title="PCB templates"
         description="Each template is a board design; its golden PCB is the known-good reference every inspection compares against."
+        actions={
+          me ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-1 px-3 py-1 text-xs text-muted-foreground">
+              <span className="font-mono tabular text-foreground">
+                {me.template_count}
+                {me.template_limit < 100000 && ` / ${me.template_limit}`}
+              </span>
+              templates · {me.plan_label} plan
+            </span>
+          ) : undefined
+        }
       />
 
       <Card className="mt-8 max-w-lg">
@@ -101,17 +129,34 @@ export default function TemplatesPage() {
                 placeholder="Notes for your team"
               />
             </div>
-            <Button type="submit" disabled={creating || !name.trim()}>
+            <Button type="submit" disabled={creating || !name.trim() || atLimit}>
               {creating ? "Creating…" : "Create template"}
             </Button>
+            {atLimit && (
+              <p className="text-xs text-severity-major">
+                You&apos;ve reached your {me?.plan_label} plan&apos;s {me?.template_limit}-template
+                limit. Upgrade on the pricing page to add more.
+              </p>
+            )}
           </form>
         </CardContent>
       </Card>
 
       <div className="mt-10">
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-medium">
-          <Layers className="size-4 text-muted-foreground" /> Existing templates
-        </h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-sm font-medium">
+            <Layers className="size-4 text-muted-foreground" /> Existing templates
+          </h2>
+          <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search templates…"
+              className="pl-9"
+            />
+          </div>
+        </div>
 
         {templates === null ? (
           <div className="space-y-3">
@@ -120,7 +165,9 @@ export default function TemplatesPage() {
           </div>
         ) : templates.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border bg-surface-1/50 px-6 py-10 text-center text-sm text-muted-foreground">
-            No templates yet — create one above.
+            {search.trim()
+              ? `No templates match "${search.trim()}".`
+              : "No templates yet — create one above."}
           </p>
         ) : (
           <div className="space-y-3">
@@ -190,6 +237,11 @@ export default function TemplatesPage() {
                 </div>
               </Card>
             ))}
+            {templates.length === PAGE_LIMIT && (
+              <p className="pt-1 text-center text-xs text-muted-foreground">
+                Showing the first {PAGE_LIMIT} results — refine your search to narrow them down.
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -3,19 +3,32 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
-import { api, Profile } from "@/lib/api";
+import { api, Profile, Plan } from "@/lib/api";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   qa_engineer: "QA Engineer",
   operator: "Operator",
 };
+
+const PLAN_OPTIONS: { value: Plan; label: string }[] = [
+  { value: "free", label: "Free" },
+  { value: "pro", label: "Pro" },
+  { value: "enterprise", label: "Enterprise" },
+];
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -24,6 +37,7 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingOrg, setSavingOrg] = useState(false);
+  const [savingPlan, setSavingPlan] = useState(false);
 
   useEffect(() => {
     api
@@ -59,6 +73,19 @@ export default function SettingsPage() {
       toast.error(e instanceof Error ? e.message : "Failed to update organization");
     } finally {
       setSavingOrg(false);
+    }
+  }
+
+  async function changePlan(plan: Plan) {
+    setSavingPlan(true);
+    try {
+      const updated = await api.updatePlan(plan);
+      setProfile(updated);
+      toast.success(`Switched to the ${updated.plan_label} plan`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to change plan");
+    } finally {
+      setSavingPlan(false);
     }
   }
 
@@ -146,6 +173,65 @@ export default function SettingsPage() {
                     <Save /> {savingOrg ? "Saving…" : "Save organization"}
                   </Button>
                 </div>
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="text-sm font-medium">Plan &amp; usage</h2>
+              <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
+                {profile.plan_label}
+              </span>
+            </div>
+            <div className="space-y-4 p-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md border border-border bg-surface-1 p-3">
+                  <p className="font-mono text-xl font-semibold tabular">
+                    {profile.template_count}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {profile.template_limit < 100000 ? ` / ${profile.template_limit}` : " / ∞"}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">PCB templates used</p>
+                </div>
+                <div className="rounded-md border border-border bg-surface-1 p-3">
+                  <p className="font-mono text-xl font-semibold tabular">
+                    {profile.inspections_per_month >= 100000
+                      ? "∞"
+                      : profile.inspections_per_month.toLocaleString()}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Inspections / month</p>
+                </div>
+              </div>
+
+              {isAdmin ? (
+                <div>
+                  <label className="text-sm text-muted-foreground">Subscription plan</label>
+                  <Select
+                    value={profile.plan}
+                    onValueChange={(v) => changePlan(v as Plan)}
+                    disabled={savingPlan}
+                  >
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PLAN_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Upgrading raises your limits and tops up your starter template library.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Only admins can change the subscription plan.
+                </p>
               )}
             </div>
           </Card>
