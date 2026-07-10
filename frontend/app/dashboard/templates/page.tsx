@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Layers, Plus, UploadCloud, CheckCircle2 } from "lucide-react";
+import { Layers, Plus, UploadCloud, CheckCircle2, Clock } from "lucide-react";
 import { api, PcbTemplate } from "@/lib/api";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
@@ -19,7 +19,6 @@ export default function TemplatesPage() {
   const [creating, setCreating] = useState(false);
   const [goldenFiles, setGoldenFiles] = useState<Record<string, File | null>>({});
   const [uploadingGolden, setUploadingGolden] = useState<string | null>(null);
-  const [goldenUploaded, setGoldenUploaded] = useState<Record<string, boolean>>({});
 
   async function loadTemplates() {
     try {
@@ -58,8 +57,8 @@ export default function TemplatesPage() {
     try {
       await api.uploadGoldenPcb(templateId, file);
       setGoldenFiles((prev) => ({ ...prev, [templateId]: null }));
-      setGoldenUploaded((prev) => ({ ...prev, [templateId]: true }));
       toast.success("Golden PCB uploaded — baseline detection runs in the background");
+      await loadTemplates();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to upload golden PCB");
     } finally {
@@ -127,10 +126,40 @@ export default function TemplatesPage() {
           <div className="space-y-3">
             {templates.map((t) => (
               <Card key={t.id} className="p-5">
-                <p className="font-medium">{t.name}</p>
-                {t.description && (
-                  <p className="mt-0.5 text-sm text-muted-foreground">{t.description}</p>
-                )}
+                <div className="flex gap-4">
+                  {t.golden_pcb && (
+                    <img
+                      // eslint-disable-next-line @next/next/no-img-element
+                      src={t.golden_pcb.image_url}
+                      alt={`${t.name} golden reference`}
+                      className="size-20 shrink-0 rounded-md border border-border object-cover"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{t.name}</p>
+                    {t.description && (
+                      <p className="mt-0.5 text-sm text-muted-foreground">{t.description}</p>
+                    )}
+                    {t.golden_pcb ? (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-primary">
+                          <CheckCircle2 className="size-3.5" /> Golden PCB uploaded
+                        </span>
+                        <span>{new Date(t.golden_pcb.created_at).toLocaleDateString()}</span>
+                        {!t.golden_pcb.baseline_ready && (
+                          <span className="inline-flex items-center gap-1 text-severity-major">
+                            <Clock className="size-3.5" /> Building baseline…
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        No golden PCB yet — upload one to enable reference comparison.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground">
                     <UploadCloud className="size-4" />
@@ -152,13 +181,12 @@ export default function TemplatesPage() {
                     onClick={() => handleGoldenUpload(t.id)}
                     disabled={!goldenFiles[t.id] || uploadingGolden === t.id}
                   >
-                    {uploadingGolden === t.id ? "Uploading…" : "Upload golden PCB"}
+                    {uploadingGolden === t.id
+                      ? "Uploading…"
+                      : t.golden_pcb
+                        ? "Replace golden PCB"
+                        : "Upload golden PCB"}
                   </Button>
-                  {goldenUploaded[t.id] && (
-                    <span className="inline-flex items-center gap-1 text-sm text-primary">
-                      <CheckCircle2 className="size-4" /> Uploaded
-                    </span>
-                  )}
                 </div>
               </Card>
             ))}

@@ -102,10 +102,19 @@ export interface DashboardStats {
   recent: Inspection[];
 }
 
+export interface GoldenPcb {
+  id: string;
+  image_url: string;
+  version: number;
+  baseline_ready: boolean;
+  created_at: string;
+}
+
 export interface PcbTemplate {
   id: string;
   name: string;
   description: string | null;
+  golden_pcb: GoldenPcb | null;
 }
 
 export interface Profile {

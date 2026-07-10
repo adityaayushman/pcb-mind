@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,10 +15,19 @@ from app.services import ai_inference, storage
 router = APIRouter(prefix="/api/pcb-templates", tags=["pcb-templates"])
 
 
+class GoldenPcbOut(BaseModel):
+    id: uuid.UUID
+    image_url: str
+    version: int
+    baseline_ready: bool
+    created_at: datetime
+
+
 class TemplateOut(BaseModel):
     id: uuid.UUID
     name: str
     description: str | None
+    golden_pcb: GoldenPcbOut | None = None
 
     class Config:
         from_attributes = True
@@ -39,14 +49,43 @@ async def create_template(
     return template
 
 
+async def _latest_golden(db: AsyncSession, template_id: uuid.UUID) -> GoldenPcbOut | None:
+    golden = (
+        await db.execute(
+            select(GoldenPCB)
+            .where(GoldenPCB.template_id == template_id)
+            .order_by(GoldenPCB.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if not golden:
+        return None
+    return GoldenPcbOut(
+        id=golden.id,
+        image_url=golden.image_url,
+        version=golden.version,
+        baseline_ready=golden.component_map is not None,
+        created_at=golden.created_at,
+    )
+
+
 @router.get("", response_model=list[TemplateOut])
 async def list_templates(
     db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
 ):
-    result = await db.execute(
-        select(PCBTemplate).where(PCBTemplate.organization_id == user.organization_id)
-    )
-    return result.scalars().all()
+    templates = (
+        await db.execute(select(PCBTemplate).where(PCBTemplate.organization_id == user.organization_id))
+    ).scalars().all()
+
+    return [
+        TemplateOut(
+            id=t.id,
+            name=t.name,
+            description=t.description,
+            golden_pcb=await _latest_golden(db, t.id),
+        )
+        for t in templates
+    ]
 
 
 async def _build_golden_baseline(golden_id: uuid.UUID, contents: bytes) -> None:
