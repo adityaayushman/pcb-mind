@@ -246,6 +246,30 @@ export interface TrainingSummary {
   by_defect_type: DefectTypeStat[];
 }
 
+export interface SpcPoint {
+  date: string;
+  value: number;
+}
+
+export interface SpcSignal {
+  date: string;
+  rule: string;
+  severity: string;
+  message: string;
+}
+
+export interface SpcOut {
+  metric: string;
+  metric_label: string;
+  points: SpcPoint[];
+  center_line: number | null;
+  ucl: number | null;
+  lcl: number | null;
+  sigma: number | null;
+  signals: SpcSignal[];
+  status: "in_control" | "drift_detected" | "insufficient_data";
+}
+
 // Inspection creation returns as soon as the upload lands — the model runs
 // afterward in the background (a cold instance can take 60-80s+, well past
 // most client/proxy request timeouts), so callers poll this until the
@@ -345,4 +369,9 @@ export const api = {
     return apiGet<Unit[]>(`/api/units${qs}`);
   },
   getUnit: (serial: string) => apiGet<UnitDetail>(`/api/units/${encodeURIComponent(serial)}`),
+  getSpc: (metric: string, days: number, templateId?: string) => {
+    const params = new URLSearchParams({ metric, days: String(days) });
+    if (templateId) params.set("template_id", templateId);
+    return apiGet<SpcOut>(`/api/spc?${params.toString()}`);
+  },
 };

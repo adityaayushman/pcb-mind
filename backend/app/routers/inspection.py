@@ -77,6 +77,12 @@ async def _process_inspection(
             )
         await db.commit()
         await _notify_inspection_done(db, inspection)
+        try:
+            from app.routers.spc import maybe_notify_drift
+
+            await maybe_notify_drift(db, inspection.organization_id)
+        except Exception:
+            pass  # drift alerting is best-effort, never blocks the inspection
 
 
 async def _notify_inspection_done(db: AsyncSession, inspection: Inspection) -> None:

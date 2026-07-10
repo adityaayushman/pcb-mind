@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, GraduationCap, ScanBarcode, LogOut, Settings, Users, User } from "lucide-react";
+import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, GraduationCap, ScanBarcode, ShieldAlert, LogOut, Settings, Users, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ const NAV_LINKS = [
   { href: "/dashboard/traceability", label: "Traceability", icon: ScanBarcode },
   { href: "/dashboard/upload", label: "New inspection", icon: ScanLine },
   { href: "/dashboard/analytics", label: "Analytics", icon: TrendingUp },
+  { href: "/dashboard/process-control", label: "Process control", icon: ShieldAlert },
   { href: "/dashboard/training", label: "Training", icon: GraduationCap },
   { href: "/dashboard/copilot", label: "Copilot", icon: Sparkles },
 ];

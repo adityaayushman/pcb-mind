@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { Bell, CheckCircle2, XCircle, AlertTriangle, CircuitBoard, CheckCheck } from "lucide-react";
+import { Bell, CheckCircle2, XCircle, AlertTriangle, CircuitBoard, CheckCheck, ShieldAlert } from "lucide-react";
 import { api, AppNotification } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -18,6 +18,7 @@ const TYPE_ICON: Record<string, { icon: React.ComponentType<{ className?: string
   inspection_failed: { icon: XCircle, tint: "text-destructive" },
   inspection_error: { icon: AlertTriangle, tint: "text-severity-major" },
   golden_ready: { icon: CircuitBoard, tint: "text-primary" },
+  process_drift: { icon: ShieldAlert, tint: "text-destructive" },
 };
 
 const POLL_MS = 45_000;
