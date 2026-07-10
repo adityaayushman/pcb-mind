@@ -111,6 +111,36 @@ export interface CopilotMessage {
   created_at: string;
 }
 
+export interface PeriodStats {
+  total: number;
+  passed: number;
+  failed: number;
+  pass_rate: number | null;
+  avg_inference_time_ms: number | null;
+}
+
+export interface DailyTrendPoint {
+  date: string;
+  total: number;
+  passed: number;
+  failed: number;
+  pass_rate: number | null;
+  avg_inference_time_ms: number | null;
+}
+
+export interface TopDefect {
+  defect_type: string;
+  count: number;
+}
+
+export interface AnalyticsOut {
+  current_period: PeriodStats;
+  previous_period: PeriodStats;
+  daily_trend: DailyTrendPoint[];
+  defect_trend: Record<string, string | number>[];
+  top_defects: TopDefect[];
+}
+
 // Inspection creation returns as soon as the upload lands — the model runs
 // afterward in the background (a cold instance can take 60-80s+, well past
 // most client/proxy request timeouts), so callers poll this until the
@@ -169,4 +199,9 @@ export const api = {
     apiPost<CopilotMessage>("/api/copilot/chat", { message }),
   getCopilotHistory: () => apiGet<CopilotMessage[]>("/api/copilot/messages"),
   clearCopilotHistory: () => apiDelete("/api/copilot/messages"),
+  getAnalytics: (days: number, templateId?: string) => {
+    const params = new URLSearchParams({ days: String(days) });
+    if (templateId) params.set("template_id", templateId);
+    return apiGet<AnalyticsOut>(`/api/analytics?${params.toString()}`);
+  },
 };
