@@ -211,6 +211,8 @@ export const api = {
     apiPost<CopilotMessage>("/api/copilot/chat", { message }),
   getCopilotHistory: () => apiGet<CopilotMessage[]>("/api/copilot/messages"),
   clearCopilotHistory: () => apiDelete("/api/copilot/messages"),
+  bootstrap: (full_name: string, organization_name: string) =>
+    apiPost<Profile>("/api/auth/bootstrap", { full_name, organization_name }),
   updateProfile: (full_name: string) => apiPatch<Profile>("/api/auth/me", { full_name }),
   updateOrganization: (name: string) => apiPatch<Profile>("/api/auth/organization", { name }),
   getAnalytics: (days: number, templateId?: string) => {

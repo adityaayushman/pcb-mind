@@ -19,17 +19,21 @@ const ROLE_LABEL: Record<string, string> = {
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingOrg, setSavingOrg] = useState(false);
 
   useEffect(() => {
-    api.getMe().then((p) => {
-      setProfile(p);
-      setFullName(p.full_name ?? "");
-      setOrgName(p.organization_name ?? "");
-    });
+    api
+      .getMe()
+      .then((p) => {
+        setProfile(p);
+        setFullName(p.full_name ?? "");
+        setOrgName(p.organization_name ?? "");
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load your account"));
   }, []);
 
   async function saveProfile() {
@@ -68,12 +72,16 @@ export default function SettingsPage() {
         description="Manage your profile and organization details."
       />
 
-      {!profile ? (
+      {error && <p className="mt-6 text-sm text-destructive">{error}</p>}
+
+      {!profile && !error && (
         <div className="mt-8 space-y-6">
           <Skeleton className="h-[220px]" />
           <Skeleton className="h-[180px]" />
         </div>
-      ) : (
+      )}
+
+      {profile && (
         <div className="mt-8 space-y-6">
           <Card>
             <div className="border-b border-border px-5 py-4">

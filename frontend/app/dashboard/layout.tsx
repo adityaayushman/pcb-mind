@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, LogOut, Settings, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,15 +30,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [email, setEmail] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
+  const profileChecked = useRef(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) {
         router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-      } else {
-        setEmail(data.session.user.email ?? null);
-        setChecked(true);
+        return;
       }
+      setEmail(data.session.user.email ?? null);
+
+      // Users who signed up through email confirmation never hit the
+      // register page's bootstrap call again after confirming -- self-heal
+      // here so a first-ever dashboard load always has a profiles row,
+      // instead of every page's own API calls 404ing forever.
+      if (!profileChecked.current) {
+        profileChecked.current = true;
+        try {
+          await api.getMe();
+        } catch {
+          const fallbackName =
+            (data.session.user.user_metadata?.full_name as string | undefined) ||
+            data.session.user.email?.split("@")[0] ||
+            "New user";
+          try {
+            await api.bootstrap(fallbackName, `${fallbackName}'s Organization`);
+          } catch {
+            // best-effort -- if this also fails, individual pages' own error
+            // handling surfaces it rather than blocking the whole layout
+          }
+        }
+      }
+
+      setChecked(true);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
