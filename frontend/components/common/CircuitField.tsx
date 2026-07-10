@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTheme } from "next-themes";
 
 /**
  * Ambient animated background: a depth-projected field of PCB solder-pad
@@ -25,6 +26,7 @@ const LINK_DIST = 140;
 
 export function CircuitField() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     const canvas = ref.current;
@@ -40,11 +42,14 @@ export function CircuitField() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     // Pull the brand green out of the CSS var so the field always matches the
-    // theme token rather than hard-coding a hex.
+    // theme token (re-read whenever the theme flips). On the light ground the
+    // same green at the same alpha nearly vanishes, so scale the opacity up.
     const primary =
       getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() ||
       "152 82% 40%";
-    const green = (a: number) => `hsl(${primary} / ${a})`;
+    const isLight = resolvedTheme === "light";
+    const alphaScale = isLight ? 2.1 : 1;
+    const green = (a: number) => `hsl(${primary} / ${Math.min(a * alphaScale, 1)})`;
 
     let w = 0;
     let h = 0;
@@ -170,7 +175,7 @@ export function CircuitField() {
       window.removeEventListener("pointermove", onPointer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, []);
+  }, [resolvedTheme]);
 
   return (
     <canvas

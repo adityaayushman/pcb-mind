@@ -15,6 +15,10 @@
  */
 
 @layer base {
+  /* Dark is the default (:root) and the committed brand identity — a dark
+     FR-4 ground with a green-cyan bias. `.light` below is the opt-in
+     inversion. Both are driven off the same token names so every component,
+     chart, and the canvas background adapt without per-theme code. */
   :root,
   .dark {
     /* Ground + surfaces — hue ~167 (green-cyan), very low saturation, dark. */
@@ -52,6 +56,46 @@
     --severity-critical: 0 84% 60%;   /* #ef4444 */
     --severity-major: 38 92% 50%;     /* #f59e0b */
     --severity-minor: 48 96% 53%;     /* #facc15 */
+
+    --radius: 0.7rem;
+  }
+
+  /* Light theme — a clean "lab bench" inversion: near-white ground with a
+     faint cool-green tint, white cards, deeper green primary for contrast on
+     white, and severity hues darkened enough to read as text on light. */
+  .light {
+    --background: 160 30% 98%;
+    --surface-1: 160 20% 96%;
+    --surface-2: 158 18% 92%;
+    --foreground: 172 28% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 172 28% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 172 28% 12%;
+
+    --primary: 152 76% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 160 18% 94%;
+    --secondary-foreground: 172 26% 18%;
+
+    --muted: 160 16% 93%;
+    --muted-foreground: 172 10% 38%;
+
+    --accent: 158 20% 92%;
+    --accent-foreground: 172 26% 18%;
+
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 165 16% 87%;
+    --input: 165 16% 83%;
+    --ring: 152 76% 40%;
+
+    --severity-critical: 0 74% 48%;
+    --severity-major: 33 92% 42%;
+    --severity-minor: 40 90% 40%;
 
     --radius: 0.7rem;
   }
