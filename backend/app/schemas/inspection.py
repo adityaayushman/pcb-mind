@@ -48,6 +48,7 @@ class InspectionOut(BaseModel):
     report_url: str | None = None
     ai_summary: str | None = None
     registration_status: str | None = None
+    serial_number: str | None = None
     created_at: datetime
     completed_at: datetime | None = None
     predictions: list[DefectPrediction] = []

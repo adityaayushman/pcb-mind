@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, inspection, dashboard, pcb, copilot, analytics, team, notifications, training
+from app.routers import auth, inspection, dashboard, pcb, copilot, analytics, team, notifications, training, traceability
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -23,6 +23,7 @@ app.include_router(analytics.router)
 app.include_router(team.router)
 app.include_router(notifications.router)
 app.include_router(training.router)
+app.include_router(traceability.router)
 
 
 @app.get("/health")

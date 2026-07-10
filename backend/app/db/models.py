@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, ForeignKey, Integer, Numeric, DateTime, Boolean, func
+from sqlalchemy import String, Text, ForeignKey, Integer, Numeric, DateTime, Boolean, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -53,11 +53,27 @@ class GoldenPCB(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class Unit(Base):
+    """A physical, serial-numbered board. One unit may be inspected many times
+    over its life (incoming, after rework, final), giving a full traceability
+    history keyed by serial number, plus optional component genealogy."""
+    __tablename__ = "units"
+    __table_args__ = (UniqueConstraint("organization_id", "serial_number", name="uq_unit_org_serial"),)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+    serial_number: Mapped[str] = mapped_column(String, nullable=False)
+    template_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("pcb_templates.id"))
+    # {"components": [{component, part_number, lot_code, supplier, date_code}]}
+    genealogy: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Inspection(Base):
     __tablename__ = "inspections"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id"))
     template_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("pcb_templates.id"))
+    unit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("units.id"))
     golden_pcb_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("golden_pcbs.id"))
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id"))
     image_url: Mapped[str] = mapped_column(Text, nullable=False)

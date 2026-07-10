@@ -91,10 +91,42 @@ export interface Inspection {
   report_url: string | null;
   ai_summary: string | null;
   registration_status: string | null;
+  serial_number: string | null;
   validation_notes: string[];
   created_at: string;
   completed_at: string | null;
   predictions: DefectPrediction[];
+}
+
+export interface Unit {
+  id: string;
+  serial_number: string;
+  template_name: string | null;
+  inspection_count: number;
+  latest_status: string | null;
+  last_inspected_at: string | null;
+  created_at: string;
+}
+
+export interface UnitComponent {
+  component: string;
+  part_number: string;
+  lot_code: string;
+  supplier: string;
+  date_code: string;
+}
+
+export interface UnitTimelineItem {
+  inspection_id: string;
+  status: string;
+  defect_count: number;
+  overall_confidence: number | null;
+  created_at: string;
+}
+
+export interface UnitDetail extends Unit {
+  genealogy: UnitComponent[];
+  timeline: UnitTimelineItem[];
 }
 
 export interface DashboardStats {
@@ -238,10 +270,16 @@ export const api = {
   getMe: () => apiGet<Profile>("/api/auth/me"),
   listInspections: () => apiGet<Inspection[]>("/api/inspections"),
   getInspection: (id: string) => apiGet<Inspection>(`/api/inspections/${id}`),
-  createInspection: async (templateId: string, goldenPcbId: string | undefined, file: File) => {
+  createInspection: async (
+    templateId: string,
+    goldenPcbId: string | undefined,
+    file: File,
+    serialNumber?: string
+  ) => {
     const form = new FormData();
     form.append("template_id", templateId);
     if (goldenPcbId) form.append("golden_pcb_id", goldenPcbId);
+    if (serialNumber && serialNumber.trim()) form.append("serial_number", serialNumber.trim());
     form.append("file", file);
     const inspection = await apiPostForm<Inspection>("/api/inspections", form);
     return pollInspection(inspection.id);
@@ -302,4 +340,9 @@ export const api = {
     ),
   getTrainingSummary: () => apiGet<TrainingSummary>("/api/training/summary"),
   exportTrainingData: () => apiDownload("/api/training/export", "training_dataset.csv"),
+  listUnits: (search?: string) => {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : "";
+    return apiGet<Unit[]>(`/api/units${qs}`);
+  },
+  getUnit: (serial: string) => apiGet<UnitDetail>(`/api/units/${encodeURIComponent(serial)}`),
 };

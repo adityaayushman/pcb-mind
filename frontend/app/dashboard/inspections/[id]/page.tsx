@@ -18,6 +18,7 @@ import {
   Bug,
   Check,
   X,
+  ScanBarcode,
 } from "lucide-react";
 import { api, Inspection, Feedback } from "@/lib/api";
 import { SEVERITY_ORDER } from "@/lib/severity";
@@ -174,6 +175,14 @@ export default function InspectionDetailPage() {
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-primary">Inspection</p>
           <h1 className="mt-1.5 font-mono text-lg tabular text-foreground">{inspection.id.slice(0, 8)}</h1>
+          {inspection.serial_number && (
+            <Link
+              href={`/dashboard/traceability/${encodeURIComponent(inspection.serial_number)}`}
+              className="mt-1 inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-primary"
+            >
+              <ScanBarcode className="size-3.5" /> {inspection.serial_number}
+            </Link>
+          )}
         </div>
         <StatusPill status={inspection.status} />
       </div>

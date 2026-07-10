@@ -47,10 +47,24 @@ create table golden_pcbs (
 
 create type inspection_status as enum ('queued', 'processing', 'passed', 'failed', 'error');
 
+-- A serial-numbered physical board; inspected potentially many times over its
+-- life for full unit traceability, with optional component genealogy.
+create table units (
+    id uuid primary key default uuid_generate_v4(),
+    organization_id uuid not null references organizations(id) on delete cascade,
+    serial_number text not null,
+    template_id uuid references pcb_templates(id),
+    genealogy jsonb,                   -- {components: [{component, part_number, lot_code, supplier, date_code}]}
+    created_at timestamptz not null default now(),
+    unique (organization_id, serial_number)
+);
+
 create table inspections (
     id uuid primary key default uuid_generate_v4(),
     organization_id uuid not null references organizations(id) on delete cascade,
     template_id uuid references pcb_templates(id),
+    unit_id uuid references units(id),
+    golden_pcb_id uuid references golden_pcbs(id),
     golden_pcb_id uuid references golden_pcbs(id),
     uploaded_by uuid references profiles(id),
     image_url text not null,

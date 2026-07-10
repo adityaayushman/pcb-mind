@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import { StagedProgress } from "./StagedProgress";
 export function UploadForm({ templates }: { templates: { id: string; name: string }[] }) {
   const router = useRouter();
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
+  const [serial, setSerial] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -51,7 +53,7 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
     setResultId(null);
     setError(null);
     try {
-      const inspection = await api.createInspection(templateId, undefined, file);
+      const inspection = await api.createInspection(templateId, undefined, file, serial);
       setResultId(inspection.id);
       setApiDone(true);
     } catch (err) {
@@ -76,6 +78,23 @@ export function UploadForm({ templates }: { templates: { id: string; name: strin
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="serial-input">
+          Serial number <span className="text-muted-foreground">(optional)</span>
+        </Label>
+        <Input
+          id="serial-input"
+          value={serial}
+          onChange={(e) => setSerial(e.target.value)}
+          disabled={loading}
+          placeholder="e.g. SN-2026-1042"
+          className="font-mono"
+        />
+        <p className="text-xs text-muted-foreground">
+          Tag this board with a serial to track its full inspection history under Traceability.
+        </p>
       </div>
 
       <div className="space-y-2">

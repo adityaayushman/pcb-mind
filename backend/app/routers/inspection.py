@@ -10,7 +10,7 @@ from sqlalchemy import select
 from app.core.security import get_current_user, require_role, CurrentUser
 from app.core.config import settings
 from app.db.database import get_db, AsyncSessionLocal
-from app.db.models import Inspection, AIPrediction, GoldenPCB, PCBTemplate
+from app.db.models import Inspection, AIPrediction, GoldenPCB, PCBTemplate, Unit
 from app.schemas.inspection import InspectionOut
 from app.services import ai_inference, storage
 from app.services import export as export_service
@@ -105,11 +105,34 @@ async def _notify_inspection_done(db: AsyncSession, inspection: Inspection) -> N
         pass
 
 
+async def _resolve_unit(
+    db: AsyncSession, org_id: uuid.UUID, serial: str | None, template_id: uuid.UUID
+) -> uuid.UUID | None:
+    """Find or create the serial-numbered unit this inspection is of, so a
+    board inspected repeatedly accrues one traceable history. No serial → a
+    one-off inspection with no unit (backwards compatible)."""
+    serial = (serial or "").strip()
+    if not serial:
+        return None
+    unit = (
+        await db.execute(
+            select(Unit).where(Unit.organization_id == org_id, Unit.serial_number == serial)
+        )
+    ).scalar_one_or_none()
+    if unit:
+        return unit.id
+    unit = Unit(organization_id=org_id, serial_number=serial, template_id=template_id)
+    db.add(unit)
+    await db.flush()
+    return unit.id
+
+
 @router.post("", response_model=InspectionOut, status_code=202)
 async def create_inspection(
     background_tasks: BackgroundTasks,
     template_id: uuid.UUID = Form(...),
     golden_pcb_id: uuid.UUID | None = Form(None),
+    serial_number: str | None = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
@@ -121,6 +144,8 @@ async def create_inspection(
     contents = await file.read()
     if len(contents) > settings.MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"Image exceeds {settings.MAX_UPLOAD_MB}MB limit")
+
+    unit_id = await _resolve_unit(db, user.organization_id, serial_number, template_id)
 
     image_url = await asyncio.to_thread(
         storage.upload_image, contents, file.content_type or "image/jpeg"
@@ -146,6 +171,7 @@ async def create_inspection(
     inspection = Inspection(
         organization_id=user.organization_id,
         template_id=template_id,
+        unit_id=unit_id,
         golden_pcb_id=golden_pcb_id,
         uploaded_by=user.id,
         image_url=image_url,
@@ -196,6 +222,9 @@ async def get_inspection(
         raise HTTPException(404, "Inspection not found")
     preds = await db.execute(select(AIPrediction).where(AIPrediction.inspection_id == inspection_id))
     inspection.predictions = preds.scalars().all()
+    if inspection.unit_id:
+        unit = await db.get(Unit, inspection.unit_id)
+        inspection.serial_number = unit.serial_number if unit else None
     return inspection
 
 
