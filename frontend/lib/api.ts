@@ -34,6 +34,16 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`PATCH ${path} failed: ${res.status}`);
+  return res.json();
+}
+
 export async function apiDelete(path: string): Promise<void> {
   const res = await fetch(`${API_URL}${path}`, { method: "DELETE", headers: await authHeader() });
   if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`);
@@ -101,8 +111,10 @@ export interface PcbTemplate {
 export interface Profile {
   id: string;
   full_name: string | null;
+  email: string | null;
   role: "admin" | "qa_engineer" | "operator";
   organization_id: string | null;
+  organization_name: string | null;
 }
 
 export interface CopilotMessage {
@@ -199,6 +211,8 @@ export const api = {
     apiPost<CopilotMessage>("/api/copilot/chat", { message }),
   getCopilotHistory: () => apiGet<CopilotMessage[]>("/api/copilot/messages"),
   clearCopilotHistory: () => apiDelete("/api/copilot/messages"),
+  updateProfile: (full_name: string) => apiPatch<Profile>("/api/auth/me", { full_name }),
+  updateOrganization: (name: string) => apiPatch<Profile>("/api/auth/organization", { name }),
   getAnalytics: (days: number, templateId?: string) => {
     const params = new URLSearchParams({ days: String(days) });
     if (templateId) params.set("template_id", templateId);
