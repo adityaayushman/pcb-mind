@@ -14,11 +14,12 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from "recharts";
-import { Gauge, ScanLine, Clock } from "lucide-react";
+import { Gauge, ScanLine, Clock, LineChart as LineChartIcon, BarChart3, Bug } from "lucide-react";
 import { api, AnalyticsOut, PcbTemplate } from "@/lib/api";
 import { getDefectSeverity, SEVERITY_HEX } from "@/lib/severity";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
+import { PanelHeader } from "@/components/common/PanelHeader";
 import { LiveBadge } from "@/components/common/LiveBadge";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Card } from "@/components/ui/card";
@@ -187,10 +188,7 @@ export default function AnalyticsPage() {
           </div>
 
           <Card>
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-sm font-medium">Pass rate trend</h2>
-              <span className="font-mono text-xs text-muted-foreground">daily</span>
-            </div>
+            <PanelHeader title="Pass rate trend" sublabel="daily" icon={<LineChartIcon className="size-4" />} />
             <div className="p-3" style={{ height: 260 }}>
               {hasTrendData ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -248,10 +246,7 @@ export default function AnalyticsPage() {
 
           <div className="grid gap-4 lg:grid-cols-5">
             <Card className="lg:col-span-3">
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <h2 className="text-sm font-medium">Inspection volume</h2>
-                <span className="font-mono text-xs text-muted-foreground">passed / failed</span>
-              </div>
+              <PanelHeader title="Inspection volume" sublabel="passed / failed" icon={<BarChart3 className="size-4" />} />
               <div className="p-3" style={{ height: 260 }}>
                 {hasTrendData ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -301,10 +296,7 @@ export default function AnalyticsPage() {
             </Card>
 
             <Card className="lg:col-span-2">
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <h2 className="text-sm font-medium">Top defects</h2>
-                <span className="font-mono text-xs text-muted-foreground">this period</span>
-              </div>
+              <PanelHeader title="Top defects" sublabel="this period" icon={<Bug className="size-4" />} />
               <div className="p-3" style={{ height: 260 }}>
                 {topDefectsData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">

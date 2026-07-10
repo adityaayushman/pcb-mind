@@ -15,10 +15,11 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { ShieldCheck, ShieldAlert, TriangleAlert, Sparkles } from "lucide-react";
+import { ShieldCheck, ShieldAlert, TriangleAlert, Sparkles, Activity } from "lucide-react";
 import { api, SpcOut, PcbTemplate } from "@/lib/api";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
+import { PanelHeader } from "@/components/common/PanelHeader";
 import { LiveBadge } from "@/components/common/LiveBadge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -221,14 +222,15 @@ export default function ProcessControlPage() {
 
           {/* AI root-cause analysis */}
           <Card>
-            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-              <h2 className="flex items-center gap-1.5 text-sm font-medium">
-                <Sparkles className="size-4 text-primary" /> AI root-cause analysis
-              </h2>
-              <Button variant="outline" size="sm" onClick={runRootCause} disabled={analyzing}>
-                {analyzing ? "Analyzing…" : analysis ? "Re-analyze" : "Analyze root cause"}
-              </Button>
-            </div>
+            <PanelHeader
+              title="AI root-cause analysis"
+              icon={<Sparkles className="size-4 text-primary" />}
+              actions={
+                <Button variant="outline" size="sm" onClick={runRootCause} disabled={analyzing}>
+                  {analyzing ? "Analyzing…" : analysis ? "Re-analyze" : "Analyze root cause"}
+                </Button>
+              }
+            />
             <div className="p-5">
               {analysis ? (
                 <div className="prose-copilot text-sm">
@@ -246,10 +248,11 @@ export default function ProcessControlPage() {
 
           {/* Control chart */}
           <Card>
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-sm font-medium">{data.metric_label} — control chart</h2>
-              <span className="font-mono text-xs text-muted-foreground">daily · 3σ limits</span>
-            </div>
+            <PanelHeader
+              title={`${data.metric_label} — control chart`}
+              sublabel="daily · 3σ limits"
+              icon={<Activity className="size-4" />}
+            />
             <div className="p-3" style={{ height: 340 }}>
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">

@@ -13,7 +13,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-border bg-surface-1 p-1 text-muted-foreground",
+      "inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-border bg-surface-1/70 p-1 text-muted-foreground backdrop-blur-sm",
       className
     )}
     {...props}
@@ -28,8 +28,10 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
-      "data-[state=active]:bg-surface-2 data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+      "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+      "text-muted-foreground hover:text-foreground",
+      // Active tab reads as a raised chip lifted off the track.
+      "data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_2px_0_rgb(0_0_0/0.3),0_1px_0_0_hsl(var(--foreground)/0.06)_inset]",
       "[&_svg]:size-4 [&_svg]:shrink-0",
       className
     )}

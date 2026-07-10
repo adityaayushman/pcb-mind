@@ -83,7 +83,8 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-lg border border-border bg-card p-5 transition-colors hover:border-muted-foreground/25",
+        "group relative overflow-hidden rounded-lg border border-border bg-card p-5 transition-all hover:border-muted-foreground/25",
+        "shadow-[0_1px_0_0_hsl(var(--foreground)/0.05)_inset,0_1px_2px_-1px_rgb(0_0_0/0.3),0_16px_32px_-24px_rgb(0_0_0/0.55)]",
         className
       )}
     >

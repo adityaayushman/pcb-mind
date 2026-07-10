@@ -6,7 +6,11 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        "rounded-lg border border-border bg-card text-card-foreground shadow-[0_1px_0_0_hsl(var(--foreground)/0.03)_inset]",
+        // Layered depth: a hairline top highlight (catches the light like a
+        // real panel), a tight contact shadow, and a soft ambient shadow —
+        // subtle enough to read well in both themes.
+        "rounded-lg border border-border bg-card text-card-foreground",
+        "shadow-[0_1px_0_0_hsl(var(--foreground)/0.05)_inset,0_1px_2px_-1px_rgb(0_0_0/0.3),0_16px_32px_-24px_rgb(0_0_0/0.55)]",
         className
       )}
       {...props}

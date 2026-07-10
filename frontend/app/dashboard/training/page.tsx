@@ -16,6 +16,7 @@ import { api, TrainingSummary } from "@/lib/api";
 import { getDefectSeverity, SEVERITY_HEX } from "@/lib/severity";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
+import { PanelHeader } from "@/components/common/PanelHeader";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -135,10 +136,11 @@ export default function TrainingPage() {
           </div>
 
           <Card>
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-sm font-medium">False-call rate by defect type</h2>
-              <span className="font-mono text-xs text-muted-foreground">where the model over-calls</span>
-            </div>
+            <PanelHeader
+              title="False-call rate by defect type"
+              sublabel="where the model over-calls"
+              icon={<Percent className="size-4" />}
+            />
             <div className="p-3" style={{ height: 300 }}>
               {fcrData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -185,9 +187,7 @@ export default function TrainingPage() {
           </Card>
 
           <Card className="overflow-hidden">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="text-sm font-medium">Per-defect breakdown</h2>
-            </div>
+            <PanelHeader title="Per-defect breakdown" icon={<ClipboardCheck className="size-4" />} />
             <div className="flex items-center gap-4 border-b border-border px-5 py-2.5 font-mono text-xs uppercase tracking-wide text-muted-foreground">
               <span className="flex-1">Defect type</span>
               <span className="w-16 text-right">Total</span>

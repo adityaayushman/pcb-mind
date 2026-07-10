@@ -21,11 +21,13 @@ import {
   Gauge,
   Download,
   ArrowRight,
+  BarChart3,
 } from "lucide-react";
 import { api, DashboardStats } from "@/lib/api";
 import { getDefectSeverity, SEVERITY_HEX } from "@/lib/severity";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
+import { PanelHeader } from "@/components/common/PanelHeader";
 import { LiveBadge } from "@/components/common/LiveBadge";
 import { StatTile } from "@/components/dashboard/StatTile";
 import { StatusPill } from "@/components/common/StatusPill";
@@ -174,10 +176,7 @@ export default function DashboardPage() {
 
           <div className="grid gap-4 lg:grid-cols-5">
             <Card className="lg:col-span-3">
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <h2 className="text-sm font-medium">Defect breakdown</h2>
-                <span className="font-mono text-xs text-muted-foreground">by frequency</span>
-              </div>
+              <PanelHeader title="Defect breakdown" sublabel="by frequency" icon={<BarChart3 className="size-4" />} />
               <div className="p-3" style={{ height: 280 }}>
                 {breakdownData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
@@ -232,10 +231,7 @@ export default function DashboardPage() {
             </Card>
 
             <Card className="lg:col-span-2">
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <h2 className="text-sm font-medium">Yield</h2>
-                <span className="font-mono text-xs text-muted-foreground">pass / fail</span>
-              </div>
+              <PanelHeader title="Yield" sublabel="pass / fail" icon={<Gauge className="size-4" />} />
               <div className="flex flex-col items-center justify-center p-6">
                 <PassRateRing passRate={passRate} />
                 <div className="mt-6 grid w-full grid-cols-2 gap-3 text-center">
