@@ -117,13 +117,23 @@ export interface PcbTemplate {
   golden_pcb: GoldenPcb | null;
 }
 
+export type Role = "admin" | "qa_engineer" | "operator";
+
 export interface Profile {
   id: string;
   full_name: string | null;
   email: string | null;
-  role: "admin" | "qa_engineer" | "operator";
+  role: Role;
   organization_id: string | null;
   organization_name: string | null;
+}
+
+export interface TeamMember {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: Role;
+  is_self: boolean;
 }
 
 export interface CopilotMessage {
@@ -224,6 +234,9 @@ export const api = {
     apiPost<Profile>("/api/auth/bootstrap", { full_name, organization_name }),
   updateProfile: (full_name: string) => apiPatch<Profile>("/api/auth/me", { full_name }),
   updateOrganization: (name: string) => apiPatch<Profile>("/api/auth/organization", { name }),
+  getTeam: () => apiGet<TeamMember[]>("/api/team"),
+  updateMemberRole: (memberId: string, role: Role) =>
+    apiPatch<TeamMember>(`/api/team/${memberId}`, { role }),
   getAnalytics: (days: number, templateId?: string) => {
     const params = new URLSearchParams({ days: String(days) });
     if (templateId) params.set("template_id", templateId);

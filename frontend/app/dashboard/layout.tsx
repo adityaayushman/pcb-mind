@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, LogOut, Settings, User } from "lucide-react";
+import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, TrendingUp, LogOut, Settings, Users, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -128,6 +128,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {email ?? "Signed in"}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/team">
+                  <Users /> Team
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/settings">
                   <Settings /> Settings
