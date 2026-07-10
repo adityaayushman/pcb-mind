@@ -84,6 +84,11 @@ create table ai_predictions (
     component_label text,
     bounding_box jsonb not null,       -- {x, y, width, height} normalized 0-1
     confidence numeric(5,4) not null,
+    is_reference_match boolean not null default false,  -- present on the golden board too → likely artifact
+    -- Human-in-the-loop verification (continuous-learning loop):
+    feedback text,                     -- null | 'confirmed' | 'rejected'
+    feedback_by uuid references profiles(id),
+    feedback_at timestamptz,
     created_at timestamptz not null default now()
 );
 

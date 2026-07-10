@@ -66,6 +66,8 @@ export async function apiDownload(path: string, filename: string): Promise<void>
 
 export type Severity = "critical" | "major" | "minor";
 
+export type Feedback = "confirmed" | "rejected" | null;
+
 export interface DefectPrediction {
   id: string;
   defect_type: string;
@@ -74,6 +76,7 @@ export interface DefectPrediction {
   confidence: number;
   severity: Severity;
   is_reference_match: boolean;
+  feedback: Feedback;
 }
 
 export interface Inspection {
@@ -193,6 +196,24 @@ export interface AnalyticsOut {
   top_defects: TopDefect[];
 }
 
+export interface DefectTypeStat {
+  defect_type: string;
+  total: number;
+  confirmed: number;
+  rejected: number;
+  false_call_rate: number | null;
+}
+
+export interface TrainingSummary {
+  total_predictions: number;
+  reviewed: number;
+  confirmed: number;
+  rejected: number;
+  coverage_percent: number | null;
+  false_call_rate_percent: number | null;
+  by_defect_type: DefectTypeStat[];
+}
+
 // Inspection creation returns as soon as the upload lands — the model runs
 // afterward in the background (a cold instance can take 60-80s+, well past
 // most client/proxy request timeouts), so callers poll this until the
@@ -274,4 +295,11 @@ export const api = {
     if (templateId) params.set("template_id", templateId);
     return apiGet<AnalyticsOut>(`/api/analytics?${params.toString()}`);
   },
+  setPredictionFeedback: (inspectionId: string, predictionId: string, feedback: Feedback) =>
+    apiPatch<{ id: string; feedback: Feedback }>(
+      `/api/inspections/${inspectionId}/predictions/${predictionId}/feedback`,
+      { feedback }
+    ),
+  getTrainingSummary: () => apiGet<TrainingSummary>("/api/training/summary"),
+  exportTrainingData: () => apiDownload("/api/training/export", "training_dataset.csv"),
 };

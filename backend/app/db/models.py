@@ -92,6 +92,11 @@ class AIPrediction(Base):
     bounding_box: Mapped[dict] = mapped_column(JSONB, nullable=False)
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
     is_reference_match: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Human-in-the-loop verification: an operator confirms a real defect or
+    # flags a false call. These verdicts build the retraining dataset.
+    feedback: Mapped[str | None] = mapped_column(String)  # None | "confirmed" | "rejected"
+    feedback_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id"))
+    feedback_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

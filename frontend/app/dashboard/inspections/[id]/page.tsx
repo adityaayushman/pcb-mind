@@ -16,8 +16,10 @@ import {
   Gauge,
   Timer,
   Bug,
+  Check,
+  X,
 } from "lucide-react";
-import { api, Inspection } from "@/lib/api";
+import { api, Inspection, Feedback } from "@/lib/api";
 import { SEVERITY_ORDER } from "@/lib/severity";
 import { DefectOverlay } from "@/components/inspection/DefectOverlay";
 import { PageContainer } from "@/components/common/PageContainer";
@@ -109,6 +111,25 @@ export default function InspectionDetailPage() {
     if (!inspection) return;
     await navigator.clipboard.writeText(inspection.image_url);
     toast.success("Image link copied");
+  }
+
+  async function setFeedback(predictionId: string, value: Exclude<Feedback, null>) {
+    if (!inspection) return;
+    const current = inspection.predictions.find((p) => p.id === predictionId)?.feedback ?? null;
+    const next: Feedback = current === value ? null : value; // click again to clear
+    const apply = (fb: Feedback) =>
+      setInspection((prev) =>
+        prev
+          ? { ...prev, predictions: prev.predictions.map((p) => (p.id === predictionId ? { ...p, feedback: fb } : p)) }
+          : prev
+      );
+    apply(next); // optimistic
+    try {
+      await api.setPredictionFeedback(inspection.id, predictionId, next);
+    } catch (e) {
+      apply(current); // revert
+      toast.error(e instanceof Error ? e.message : "Failed to save feedback");
+    }
   }
 
   if (error) {
@@ -278,16 +299,21 @@ export default function InspectionDetailPage() {
       {/* Detected defects table */}
       {sortedPredictions.length > 0 && (
         <div className="mt-10">
-          <div className="mb-3 flex items-center gap-2">
-            <h2 className="text-sm font-medium">Detected defects</h2>
-            <span className="font-mono text-xs text-muted-foreground">({sortedPredictions.length})</span>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-medium">Detected defects</h2>
+              <span className="font-mono text-xs text-muted-foreground">({sortedPredictions.length})</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Confirm real defects or flag false calls — your review trains the model.
+            </p>
           </div>
           <Card className="overflow-hidden">
             {sortedPredictions.map((p) => (
               <div
                 key={p.id}
                 className={cn(
-                  "flex items-center gap-4 border-b border-border px-4 py-3 text-sm transition-colors last:border-0 hover:bg-surface-1",
+                  "flex items-center gap-3 border-b border-border px-4 py-3 text-sm transition-colors last:border-0 hover:bg-surface-1 sm:gap-4",
                   p.is_reference_match && "opacity-45"
                 )}
               >
@@ -296,14 +322,39 @@ export default function InspectionDetailPage() {
                   style={{ background: `hsl(var(--severity-${p.severity}))` }}
                 />
                 <SeverityBadge severity={p.severity} className="w-16 justify-center" />
-                <span className="flex-1 font-medium">{p.defect_type.replace(/_/g, " ")}</span>
-                <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
+                <span className="flex-1 truncate font-medium">{p.defect_type.replace(/_/g, " ")}</span>
+                <span className="hidden font-mono text-xs text-muted-foreground md:inline">
                   {p.component_label ?? "—"}
                 </span>
                 <span className="font-mono text-sm tabular">{Math.round(p.confidence * 100)}%</span>
-                {p.is_reference_match && (
-                  <span className="hidden text-[10px] italic text-muted-foreground md:inline">reference match</span>
-                )}
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => setFeedback(p.id, "confirmed")}
+                    aria-label="Confirm real defect"
+                    title="Real defect"
+                    className={cn(
+                      "flex size-7 items-center justify-center rounded-md border transition-colors",
+                      p.feedback === "confirmed"
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
+                    )}
+                  >
+                    <Check className="size-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setFeedback(p.id, "rejected")}
+                    aria-label="Flag false call"
+                    title="False call"
+                    className={cn(
+                      "flex size-7 items-center justify-center rounded-md border transition-colors",
+                      p.feedback === "rejected"
+                        ? "border-destructive bg-destructive/15 text-destructive"
+                        : "border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                    )}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </Card>

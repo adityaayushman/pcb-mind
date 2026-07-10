@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, UploadFile, File, Form
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -196,6 +197,39 @@ async def get_inspection(
     preds = await db.execute(select(AIPrediction).where(AIPrediction.inspection_id == inspection_id))
     inspection.predictions = preds.scalars().all()
     return inspection
+
+
+class PredictionFeedback(BaseModel):
+    feedback: str | None  # "confirmed" | "rejected" | null to clear
+
+
+@router.patch("/{inspection_id}/predictions/{prediction_id}/feedback")
+async def set_prediction_feedback(
+    inspection_id: uuid.UUID,
+    prediction_id: uuid.UUID,
+    payload: PredictionFeedback,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Human-in-the-loop verdict on a single detection — the operator confirms
+    a real defect or flags a false call. Any role in the org may review; the
+    accumulated verdicts feed the retraining dataset (see routers/training.py)."""
+    if payload.feedback not in (None, "confirmed", "rejected"):
+        raise HTTPException(400, "feedback must be 'confirmed', 'rejected', or null")
+
+    inspection = await db.get(Inspection, inspection_id)
+    if not inspection or inspection.organization_id != user.organization_id:
+        raise HTTPException(404, "Inspection not found")
+
+    prediction = await db.get(AIPrediction, prediction_id)
+    if not prediction or prediction.inspection_id != inspection_id:
+        raise HTTPException(404, "Prediction not found")
+
+    prediction.feedback = payload.feedback
+    prediction.feedback_by = uuid.UUID(user.id) if payload.feedback else None
+    prediction.feedback_at = datetime.utcnow() if payload.feedback else None
+    await db.commit()
+    return {"id": str(prediction.id), "feedback": prediction.feedback}
 
 
 @router.get("", response_model=list[InspectionOut])

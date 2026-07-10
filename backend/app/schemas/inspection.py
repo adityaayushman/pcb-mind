@@ -20,6 +20,7 @@ class DefectPrediction(BaseModel):
     bounding_box: BoundingBox
     confidence: float
     is_reference_match: bool = False
+    feedback: str | None = None  # None | "confirmed" | "rejected"
 
     @computed_field
     @property
