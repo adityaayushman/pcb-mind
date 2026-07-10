@@ -118,6 +118,23 @@ async def _build_golden_baseline(golden_id: uuid.UUID, contents: bytes) -> None:
             golden.component_map = component_map
             await db.commit()
 
+            template = await db.get(PCBTemplate, golden.template_id)
+            if template:
+                from app.services.notifications import create_notification
+
+                try:
+                    await create_notification(
+                        db,
+                        organization_id=template.organization_id,
+                        user_id=template.created_by,
+                        type="golden_ready",
+                        title="Golden PCB baseline ready",
+                        body=f'Reference detection finished for "{template.name}".',
+                        link="/dashboard/templates",
+                    )
+                except Exception:
+                    pass
+
 
 @router.post("/{template_id}/golden", status_code=202)
 async def upload_golden_pcb(

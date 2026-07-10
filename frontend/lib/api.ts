@@ -136,6 +136,21 @@ export interface TeamMember {
   is_self: boolean;
 }
 
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationList {
+  items: AppNotification[];
+  unread_count: number;
+}
+
 export interface CopilotMessage {
   role: "user" | "assistant";
   content: string;
@@ -237,6 +252,10 @@ export const api = {
   getTeam: () => apiGet<TeamMember[]>("/api/team"),
   updateMemberRole: (memberId: string, role: Role) =>
     apiPatch<TeamMember>(`/api/team/${memberId}`, { role }),
+  getNotifications: () => apiGet<NotificationList>("/api/notifications"),
+  markNotificationRead: (id: string) =>
+    apiPost<AppNotification>(`/api/notifications/${id}/read`, {}),
+  markAllNotificationsRead: () => apiPost<void>("/api/notifications/read-all", {}),
   getAnalytics: (days: number, templateId?: string) => {
     const params = new URLSearchParams({ days: String(days) });
     if (templateId) params.set("template_id", templateId);

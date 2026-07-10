@@ -49,6 +49,7 @@ async def _process_inspection(
                 inspection.status = "error"
                 inspection.completed_at = datetime.utcnow()
                 await db.commit()
+                await _notify_inspection_done(db, inspection)
         return
 
     async with AsyncSessionLocal() as db:
@@ -74,6 +75,33 @@ async def _process_inspection(
                 )
             )
         await db.commit()
+        await _notify_inspection_done(db, inspection)
+
+
+async def _notify_inspection_done(db: AsyncSession, inspection: Inspection) -> None:
+    """Best-effort alert to the uploader once their inspection settles."""
+    from app.services.notifications import create_notification
+
+    if inspection.status == "passed":
+        title, body = "Inspection passed", "No blocking defects found."
+    elif inspection.status == "failed":
+        n = inspection.defect_count
+        title, body = "Inspection failed", f"{n} defect{'' if n == 1 else 's'} detected."
+    else:
+        title, body = "Inspection couldn't be processed", "The image failed during analysis."
+
+    try:
+        await create_notification(
+            db,
+            organization_id=inspection.organization_id,
+            user_id=inspection.uploaded_by,
+            type=f"inspection_{inspection.status}",
+            title=title,
+            body=body,
+            link=f"/dashboard/inspections/{inspection.id}",
+        )
+    except Exception:
+        pass
 
 
 @router.post("", response_model=InspectionOut, status_code=202)

@@ -100,6 +100,24 @@ create table copilot_messages (
     created_at timestamptz not null default now()
 );
 
+-- ========== NOTIFICATIONS ==========
+-- In-app alerts targeted at a specific recipient (the inspection's uploader,
+-- the golden-PCB uploader, etc.). Written by background jobs the moment an
+-- event completes so the header bell surfaces it without the user polling
+-- the dashboard.
+
+create table notifications (
+    id uuid primary key default uuid_generate_v4(),
+    organization_id uuid not null references organizations(id) on delete cascade,
+    user_id uuid not null references profiles(id) on delete cascade,
+    type text not null,
+    title text not null,
+    body text,
+    link text,
+    is_read boolean not null default false,
+    created_at timestamptz not null default now()
+);
+
 -- ========== ACTIVITY / AUDIT LOG ==========
 
 create table activity_logs (
@@ -116,6 +134,7 @@ create table activity_logs (
 -- ========== INDEXES ==========
 
 create index idx_copilot_messages_user on copilot_messages(user_id, created_at);
+create index idx_notifications_user on notifications(user_id, is_read, created_at desc);
 create index idx_inspections_org on inspections(organization_id);
 create index idx_inspections_status on inspections(status);
 create index idx_predictions_inspection on ai_predictions(inspection_id);
