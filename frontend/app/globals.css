@@ -79,6 +79,35 @@
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
+  /* Minimal markdown styling for copilot responses — no @tailwindcss/typography
+     dependency for a handful of elements the LLM realistically produces. */
+  .prose-copilot > * + * {
+    margin-top: 0.6em;
+  }
+  .prose-copilot strong {
+    @apply font-semibold text-foreground;
+  }
+  .prose-copilot ul,
+  .prose-copilot ol {
+    @apply ml-4 space-y-1;
+  }
+  .prose-copilot ul {
+    list-style-type: disc;
+  }
+  .prose-copilot ol {
+    list-style-type: decimal;
+  }
+  .prose-copilot code {
+    @apply rounded bg-surface-2 px-1 py-0.5 font-mono text-[0.85em];
+  }
+  .prose-copilot a {
+    @apply text-primary underline underline-offset-2;
+  }
+  .prose-copilot h1,
+  .prose-copilot h2,
+  .prose-copilot h3 {
+    @apply font-semibold text-foreground;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

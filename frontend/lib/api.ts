@@ -24,6 +24,21 @@ export async function apiPostForm<T>(path: string, form: FormData): Promise<T> {
   return res.json();
 }
 
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+  return res.json();
+}
+
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, { method: "DELETE", headers: await authHeader() });
+  if (!res.ok) throw new Error(`DELETE ${path} failed: ${res.status}`);
+}
+
 // Bare navigation (<a href>) can't attach the auth header, so authenticated
 // file downloads (export, etc.) need to fetch + blob + trigger the download
 // themselves rather than just linking straight at the endpoint.
@@ -90,6 +105,12 @@ export interface Profile {
   organization_id: string | null;
 }
 
+export interface CopilotMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
 // Inspection creation returns as soon as the upload lands — the model runs
 // afterward in the background (a cold instance can take 60-80s+, well past
 // most client/proxy request timeouts), so callers poll this until the
@@ -144,4 +165,8 @@ export const api = {
       form
     );
   },
+  sendCopilotMessage: (message: string) =>
+    apiPost<CopilotMessage>("/api/copilot/chat", { message }),
+  getCopilotHistory: () => apiGet<CopilotMessage[]>("/api/copilot/messages"),
+  clearCopilotHistory: () => apiDelete("/api/copilot/messages"),
 };

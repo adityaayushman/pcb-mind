@@ -92,3 +92,13 @@ class AIPrediction(Base):
     confidence: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
     is_reference_match: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CopilotMessage(Base):
+    __tablename__ = "copilot_messages"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id"))
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("profiles.id"))
+    role: Mapped[str] = mapped_column(String, nullable=False)  # "user" | "assistant" (plain text + CHECK constraint, not a pg enum)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

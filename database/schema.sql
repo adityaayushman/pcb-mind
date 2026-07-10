@@ -86,6 +86,20 @@ create table ai_predictions (
     created_at timestamptz not null default now()
 );
 
+-- ========== AI MANUFACTURING COPILOT ==========
+-- One continuous conversation per user (not full multi-thread management),
+-- tool queries scoped by organization_id so teammates asking about the same
+-- org get consistent answers regardless of whose conversation it's in.
+
+create table copilot_messages (
+    id uuid primary key default uuid_generate_v4(),
+    organization_id uuid not null references organizations(id) on delete cascade,
+    user_id uuid not null references profiles(id) on delete cascade,
+    role text not null check (role in ('user', 'assistant')),
+    content text not null,
+    created_at timestamptz not null default now()
+);
+
 -- ========== ACTIVITY / AUDIT LOG ==========
 
 create table activity_logs (
@@ -101,6 +115,7 @@ create table activity_logs (
 
 -- ========== INDEXES ==========
 
+create index idx_copilot_messages_user on copilot_messages(user_id, created_at);
 create index idx_inspections_org on inspections(organization_id);
 create index idx_inspections_status on inspections(status);
 create index idx_predictions_inspection on ai_predictions(inspection_id);

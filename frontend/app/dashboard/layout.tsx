@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CircuitBoard, LayoutDashboard, Layers, ScanLine, LogOut, User } from "lucide-react";
+import { CircuitBoard, LayoutDashboard, Layers, ScanLine, Sparkles, LogOut, User } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/templates", label: "Templates", icon: Layers },
   { href: "/dashboard/upload", label: "New inspection", icon: ScanLine },
+  { href: "/dashboard/copilot", label: "Copilot", icon: Sparkles },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
