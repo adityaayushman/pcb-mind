@@ -374,4 +374,5 @@ export const api = {
     if (templateId) params.set("template_id", templateId);
     return apiGet<SpcOut>(`/api/spc?${params.toString()}`);
   },
+  getRootCause: () => apiGet<{ analysis: string | null }>("/api/spc/root-cause"),
 };

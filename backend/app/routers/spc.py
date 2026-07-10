@@ -101,6 +101,19 @@ async def get_spc(
     return SpcOut(metric=metric, metric_label=METRIC_LABELS[metric], **chart)
 
 
+@router.get("/root-cause")
+async def root_cause(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """AI root-cause analysis of the org's current quality signal — what's
+    driving the fail rate and what to do about it. Local import keeps the
+    spc <-> root_cause dependency from cycling at module load."""
+    from app.services.root_cause import analyze_drift
+
+    analysis = await analyze_drift(db, user.organization_id)
+    return {"analysis": analysis}
+
+
 async def maybe_notify_drift(db: AsyncSession, org_id: uuid.UUID) -> None:
     """Called when an inspection settles: if the fail-rate process has just
     drifted out of control (a signal lands on the most recent day), alert the

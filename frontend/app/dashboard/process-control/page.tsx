@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   LineChart,
   Line,
@@ -12,12 +15,13 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
-import { ShieldCheck, ShieldAlert, TriangleAlert } from "lucide-react";
+import { ShieldCheck, ShieldAlert, TriangleAlert, Sparkles } from "lucide-react";
 import { api, SpcOut, PcbTemplate } from "@/lib/api";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
 import { LiveBadge } from "@/components/common/LiveBadge";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -50,6 +54,20 @@ export default function ProcessControlPage() {
   const [metric, setMetric] = useState("fail_rate");
   const [days, setDays] = useState(30);
   const [templateId, setTemplateId] = useState("all");
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
+  async function runRootCause() {
+    setAnalyzing(true);
+    try {
+      const { analysis } = await api.getRootCause();
+      setAnalysis(analysis ?? "Couldn't generate an analysis right now.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   useEffect(() => {
     api.listTemplates(undefined, 1000).then(setTemplates).catch(() => {});
@@ -198,6 +216,31 @@ export default function ProcessControlPage() {
                   </ul>
                 )}
               </div>
+            </div>
+          </Card>
+
+          {/* AI root-cause analysis */}
+          <Card>
+            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+              <h2 className="flex items-center gap-1.5 text-sm font-medium">
+                <Sparkles className="size-4 text-primary" /> AI root-cause analysis
+              </h2>
+              <Button variant="outline" size="sm" onClick={runRootCause} disabled={analyzing}>
+                {analyzing ? "Analyzing…" : analysis ? "Re-analyze" : "Analyze root cause"}
+              </Button>
+            </div>
+            <div className="p-5">
+              {analysis ? (
+                <div className="prose-copilot text-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {analyzing
+                    ? "Reading recent defect, board, and control-chart data to find the probable cause…"
+                    : "Ask the AI to diagnose what's driving the current quality signal — grounded in your defect mix, worst-performing boards, and drift signals — and recommend concrete actions."}
+                </p>
+              )}
             </div>
           </Card>
 
