@@ -105,10 +105,10 @@ def _apply_clahe(img: np.ndarray) -> np.ndarray:
     would shift hue/saturation and risk the model reacting to color
     changes rather than the copper/silkscreen edges it was trained on."""
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
+    lightness, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=_CLAHE_CLIP_LIMIT, tileGridSize=_CLAHE_TILE_GRID_SIZE)
-    l = clahe.apply(l)
-    return cv2.cvtColor(cv2.merge((l, a, b)), cv2.COLOR_LAB2BGR)
+    lightness = clahe.apply(lightness)
+    return cv2.cvtColor(cv2.merge((lightness, a, b)), cv2.COLOR_LAB2BGR)
 
 
 def _preprocess(image_bytes: bytes) -> np.ndarray:
