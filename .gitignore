@@ -21,7 +21,7 @@ ml/*.pt
 .DS_Store
 Thumbs.db
 
-# Local Claude Code settings (machine-specific)
-.claude/settings.local.json
+# Local tooling / editor settings (machine-specific)
+.claude/
 
 .vercel
