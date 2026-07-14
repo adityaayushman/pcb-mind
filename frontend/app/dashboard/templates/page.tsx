@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Layers, Plus, UploadCloud, CheckCircle2, Clock, Search } from "lucide-react";
 import { api, PcbTemplate, Profile } from "@/lib/api";
+import { looksLikeGerber, renderGerberToPng } from "@/lib/gerber";
 import { PageContainer } from "@/components/common/PageContainer";
 import { SectionHeading } from "@/components/common/SectionHeading";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,13 @@ export default function TemplatesPage() {
     if (!file) return;
     setUploadingGolden(templateId);
     try {
-      await api.uploadGoldenPcb(templateId, file);
+      // A Gerber design file is rendered to a board image client-side, then
+      // uploaded through the same path as a photographed golden board.
+      let toUpload = file;
+      if (looksLikeGerber(file, await file.slice(0, 2048).text())) {
+        toUpload = await renderGerberToPng(file);
+      }
+      await api.uploadGoldenPcb(templateId, toUpload);
       setGoldenFiles((prev) => ({ ...prev, [templateId]: null }));
       toast.success("Golden PCB uploaded — baseline detection runs in the background");
       await loadTemplates(search.trim());
@@ -211,11 +218,11 @@ export default function TemplatesPage() {
                   <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-surface-1 px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground">
                     <UploadCloud className="size-4" />
                     <span className="max-w-44 truncate">
-                      {goldenFiles[t.id]?.name ?? "Choose golden board image"}
+                      {goldenFiles[t.id]?.name ?? "Choose board image or Gerber"}
                     </span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.gbr,.ger,.gtl,.gbl,.gto,.gbo,.gts,.gbs,.gko,.gm1,.gml,.art"
                       className="sr-only"
                       onChange={(e) =>
                         setGoldenFiles((prev) => ({ ...prev, [t.id]: e.target.files?.[0] ?? null }))
@@ -229,12 +236,17 @@ export default function TemplatesPage() {
                     disabled={!goldenFiles[t.id] || uploadingGolden === t.id}
                   >
                     {uploadingGolden === t.id
-                      ? "Uploading…"
+                      ? "Rendering…"
                       : t.golden_pcb
                         ? "Replace golden PCB"
                         : "Upload golden PCB"}
                   </Button>
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Upload a photo of a known-good board, or a Gerber layer (e.g. top copper
+                  <span className="font-mono"> .gtl</span>) — the Gerber renders to a board image
+                  automatically.
+                </p>
               </Card>
             ))}
             {templates.length === PAGE_LIMIT && (
