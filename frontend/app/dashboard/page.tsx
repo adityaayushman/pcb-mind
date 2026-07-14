@@ -34,6 +34,7 @@ import { StatusPill } from "@/components/common/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const REFRESH_MS = 20_000;
 
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [canExport, setCanExport] = useState(false);
   const [exporting, setExporting] = useState<"csv" | "xlsx" | null>(null);
+  const [exportDays, setExportDays] = useState("all");
 
   useEffect(() => {
     let active = true;
@@ -84,7 +86,7 @@ export default function DashboardPage() {
   async function handleExport(format: "csv" | "xlsx") {
     setExporting(format);
     try {
-      await api.exportInspections(format);
+      await api.exportInspections(format, exportDays === "all" ? undefined : Number(exportDays));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export failed");
     } finally {
@@ -118,6 +120,18 @@ export default function DashboardPage() {
               <LiveBadge lastUpdated={lastUpdated} />
               {canExport && (
                 <>
+                  <Select value={exportDays} onValueChange={setExportDays}>
+                    <SelectTrigger className="h-8 w-32 text-xs" aria-label="Export date range">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Last 7 days</SelectItem>
+                      <SelectItem value="30">Last 30 days</SelectItem>
+                      <SelectItem value="90">Last 90 days</SelectItem>
+                      <SelectItem value="365">Last year</SelectItem>
+                      <SelectItem value="all">All time</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="outline"
                     size="sm"

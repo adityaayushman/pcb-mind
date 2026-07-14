@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, UploadFile, File, Form
 from pydantic import BaseModel
@@ -197,19 +197,23 @@ async def create_inspection(
 @router.get("/export")
 async def export_inspections(
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    days: int | None = Query(None, ge=1, le=3650, description="Only include the last N days; omit for all time"),
     db: AsyncSession = Depends(get_db),
     user: CurrentUser = Depends(require_role("admin", "qa_engineer")),
 ):
     """Bulk org-wide inspection export — gated to admin/qa_engineer since it's
-    a supervisory view across everyone's inspections, not "your own work"."""
+    a supervisory view across everyone's inspections, not "your own work".
+    Optionally bounded to the last `days` so a report can cover just a period
+    instead of the entire history."""
+    start = datetime.utcnow() - timedelta(days=days) if days else None
     if format == "xlsx":
-        content = await export_service.export_xlsx(db, user.organization_id)
+        content = await export_service.export_xlsx(db, user.organization_id, start)
         return Response(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": 'attachment; filename="inspections.xlsx"'},
         )
-    content = await export_service.export_csv(db, user.organization_id)
+    content = await export_service.export_csv(db, user.organization_id, start)
     return Response(
         content=content,
         media_type="text/csv",

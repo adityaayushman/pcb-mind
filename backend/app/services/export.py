@@ -4,6 +4,7 @@ pattern of keeping the router thin and the file-format logic here."""
 import csv
 import io
 import uuid
+from datetime import datetime
 from dataclasses import dataclass, asdict
 
 import openpyxl
@@ -36,12 +37,17 @@ class ExportRow:
     report_url: str
 
 
-async def _fetch_export_rows(db: AsyncSession, organization_id: uuid.UUID | str) -> list[ExportRow]:
+async def _fetch_export_rows(
+    db: AsyncSession, organization_id: uuid.UUID | str, start: datetime | None = None
+) -> list[ExportRow]:
+    filters = [Inspection.organization_id == organization_id]
+    if start is not None:
+        filters.append(Inspection.created_at >= start)
     result = await db.execute(
         select(Inspection, PCBTemplate.name, Profile.full_name)
         .outerjoin(PCBTemplate, PCBTemplate.id == Inspection.template_id)
         .outerjoin(Profile, Profile.id == Inspection.uploaded_by)
-        .where(Inspection.organization_id == organization_id)
+        .where(*filters)
         .order_by(Inspection.created_at.desc())
     )
     rows = result.all()
@@ -81,8 +87,10 @@ async def _fetch_export_rows(db: AsyncSession, organization_id: uuid.UUID | str)
     return export_rows
 
 
-async def export_csv(db: AsyncSession, organization_id: uuid.UUID | str) -> str:
-    rows = await _fetch_export_rows(db, organization_id)
+async def export_csv(
+    db: AsyncSession, organization_id: uuid.UUID | str, start: datetime | None = None
+) -> str:
+    rows = await _fetch_export_rows(db, organization_id, start)
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=_COLUMNS)
     writer.writeheader()
@@ -91,8 +99,10 @@ async def export_csv(db: AsyncSession, organization_id: uuid.UUID | str) -> str:
     return buffer.getvalue()
 
 
-async def export_xlsx(db: AsyncSession, organization_id: uuid.UUID | str) -> bytes:
-    rows = await _fetch_export_rows(db, organization_id)
+async def export_xlsx(
+    db: AsyncSession, organization_id: uuid.UUID | str, start: datetime | None = None
+) -> bytes:
+    rows = await _fetch_export_rows(db, organization_id, start)
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Inspections"

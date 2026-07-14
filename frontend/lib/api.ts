@@ -313,8 +313,11 @@ export const api = {
     apiGet<{ heatmap_image_url: string | null }>(`/api/inspections/${id}/heatmap`),
   getAiSummary: (id: string) =>
     apiGet<{ ai_summary: string | null }>(`/api/inspections/${id}/ai-summary`),
-  exportInspections: (format: "csv" | "xlsx") =>
-    apiDownload(`/api/inspections/export?format=${format}`, `inspections.${format}`),
+  exportInspections: (format: "csv" | "xlsx", days?: number) => {
+    const params = new URLSearchParams({ format });
+    if (days) params.set("days", String(days));
+    return apiDownload(`/api/inspections/export?${params.toString()}`, `inspections.${format}`);
+  },
   listTemplates: (search?: string, limit?: number) => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
