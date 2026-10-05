@@ -33,10 +33,11 @@ Manual visual inspection of printed circuit boards is slow, inconsistent between
 
 ## 📸 Demo
 
-<!-- Add a screenshot or GIF here — it is the single biggest driver of stars.
-     e.g. ![PCBMind demo](docs/demo.gif) -->
+<p align="center">
+  <img src="docs/demo.webp" alt="PCBMind AI demo" width="420" />
+</p>
 
-> 🖼️ *Screenshots coming soon.*
+<p align="center"><a href="https://pcbmind-ai.vercel.app"><b>▶ Try the live app</b></a></p>
 
 ## ✨ Features
 
