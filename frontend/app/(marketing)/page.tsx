@@ -54,13 +54,13 @@ export default function LandingPage() {
           <div className="animate-fade-up [animation-delay:150ms]">
             <div className="relative rounded-xl border border-border bg-surface-1/80 p-4 shadow-2xl shadow-black/40 backdrop-blur">
               <div className="flex items-center justify-between pb-3">
-                <span className="font-mono text-xs text-muted-foreground">inspection · live</span>
+                <span className="font-mono text-xs text-muted-foreground">inspection · example</span>
                 <span className="inline-flex items-center gap-1.5 font-mono text-xs text-primary">
                   <span className="relative flex size-2">
                     <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
                     <span className="relative inline-flex size-2 rounded-full bg-primary" />
                   </span>
-                  scanning
+                  illustrative
                 </span>
               </div>
               {/* Stylized board */}
@@ -107,6 +107,9 @@ export default function LandingPage() {
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">inference</p>
                 </div>
               </div>
+              <p className="mt-3 text-center font-mono text-[10px] text-muted-foreground">
+                Illustrative example, not a live result.
+              </p>
             </div>
           </div>
         </div>

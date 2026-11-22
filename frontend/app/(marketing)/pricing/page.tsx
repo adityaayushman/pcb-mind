@@ -71,6 +71,9 @@ export default function PricingPage() {
       <p className="mt-4 max-w-2xl text-muted-foreground md:text-lg">
         Talk to us when you&apos;re ready to roll inspection out across your QA team.
       </p>
+      <p className="mt-4 max-w-2xl rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        These plans are a proposed model. Billing is not live: no payment is taken, and switching plans in the dashboard is a demo.
+      </p>
 
       <div className="mt-14 grid gap-4 md:grid-cols-3">
         {TIERS.map((tier) => (
