@@ -28,7 +28,7 @@ Manual visual inspection of printed circuit boards is slow, inconsistent between
 ## Demo
 
 <p align="center">
-  <img src="docs/demo.webp" alt="PCBMind AI demo" width="420" />
+  <img src="docs/demo.webp" alt="PCBMind AI demo" width="640" />
 </p>
 
 <p align="center"><a href="https://pcbmind-ai.vercel.app"><b>Try the live app</b></a></p>
